@@ -34,10 +34,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
       }`}
     >
       <div
-        className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md ${
+        className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-md ${
           isUser
             ? 'bg-slate-800 border border-slate-700 text-slate-200'
-            : 'bg-gradient-to-br from-emerald-500 to-teal-600 text-slate-950 shadow-emerald-500/20'
+            : 'bg-linear-to-br from-emerald-500 to-teal-600 text-slate-950 shadow-emerald-500/20'
         }`}
       >
         {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}

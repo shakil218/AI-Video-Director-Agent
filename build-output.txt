@@ -1,0 +1,29 @@
+
+> ai-video-director-agent@0.1.0 build
+> next build
+
+Γû▓ Next.js 16.3.1 (Turbopack)
+- Environments: .env.local
+Γ£ô Running next.config.ts took 63ms
+
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 1540ms
+  Running TypeScript ...
+  Finished TypeScript in 7.8s ...
+  Collecting page data using 5 workers ...
+  Generating static pages using 5 workers (0/5) ...
+  Generating static pages using 5 workers (1/5) 
+  Generating static pages using 5 workers (2/5) 
+  Generating static pages using 5 workers (3/5) 
+Γ£ô Generating static pages using 5 workers (5/5) in 251ms
+  Finalizing page optimization ...
+
+Route (app)
+Γöî Γùï /
+Γö£ Γùï /_not-found
+Γöö ╞Æ /api/proxy-video
+
+
+Γùï  (Static)   prerendered as static content
+╞Æ  (Dynamic)  server-rendered on demand
+

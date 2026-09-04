@@ -51,7 +51,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pr-1 space-y-2 min-h-[320px] max-h-[480px] scrollbar-thin scrollbar-thumb-slate-800">
+      <div className="flex-1 overflow-y-auto pr-1 space-y-2 min-h-80 max-h-120 scrollbar-thin scrollbar-thumb-slate-800">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full py-12 text-center text-slate-500 space-y-3">
             <div className="w-12 h-12 rounded-full bg-slate-800/60 border border-slate-700 flex items-center justify-center text-slate-400">

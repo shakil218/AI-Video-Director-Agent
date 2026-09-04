@@ -58,7 +58,7 @@ export const BRollPromptCard: React.FC<BRollPromptCardProps> = ({
         <button
           onClick={handleCopyPrompt}
           title="Copy AI Prompt"
-          className="text-slate-400 hover:text-cyan-400 transition-colors p-1 rounded hover:bg-slate-800 flex-shrink-0"
+          className="text-slate-400 hover:text-cyan-400 transition-colors p-1 rounded hover:bg-slate-800 shrink-0"
         >
           {copied ? <Check className="w-3.5 h-3.5 text-cyan-400" /> : <Copy className="w-3.5 h-3.5" />}
         </button>

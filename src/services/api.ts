@@ -249,10 +249,11 @@ export async function sendFeedback(
   }
 
   try {
-    const payload: WebhookFeedbackPayload = {
-      action: 'feedback',
+    const payload = {
+      action: 'revision',
       sessionId,
-      message: userMessage,
+      prompt: userMessage, // Enables {{ $json.body.prompt }} in n8n
+      message: userMessage, // Preserves backward compatibility
       currentPlan,
     };
 
