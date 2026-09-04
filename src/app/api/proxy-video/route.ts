@@ -1,55 +1,84 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
     headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Range, Authorization",
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Range',
     },
   });
 }
 
-export async function GET(req: NextRequest) {
-  const targetUrl = req.nextUrl.searchParams.get("url");
-
-  if (!targetUrl) {
-    return new NextResponse("Missing URL parameter", { status: 400 });
-  }
-
-  const rangeHeader = req.headers.get("range");
-
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    let targetUrl = searchParams.get('url');
+
+    if (!targetUrl) {
+      return new NextResponse('Missing "url" parameter', { status: 400 });
+    }
+
+    // Unwrap double/nested proxy URLs if present
+    while (targetUrl.includes('/api/proxy-video?url=')) {
+      const parts = targetUrl.split('/api/proxy-video?url=');
+      targetUrl = decodeURIComponent(parts[parts.length - 1]);
+    }
+
+    // Extract range header from incoming request for video seeking
+    const range = request.headers.get('range');
+
+    const fetchHeaders: Record<string, string> = {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Accept: '*/*',
+    };
+
+    if (range) {
+      fetchHeaders['Range'] = range;
+    }
+
     const response = await fetch(targetUrl, {
-      headers: rangeHeader ? { Range: rangeHeader } : {},
+      headers: fetchHeaders,
+      cache: 'no-store',
     });
 
     if (!response.ok) {
       return new NextResponse(`Media stream error: ${response.statusText}`, {
         status: response.status,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+        },
       });
     }
 
-    const headers = new Headers();
-    headers.set("Access-Control-Allow-Origin", "*");
-    headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
-    headers.set("Access-Control-Allow-Headers", "Content-Type, Range, Authorization");
-    headers.set("Accept-Ranges", "bytes");
+    const responseHeaders = new Headers();
+    responseHeaders.set('Access-Control-Allow-Origin', '*');
+    responseHeaders.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    responseHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Range');
 
-    const contentType = response.headers.get("content-type");
-    const contentRange = response.headers.get("content-range");
-    const contentLength = response.headers.get("content-length");
+    const contentType = response.headers.get('content-type');
+    const contentLength = response.headers.get('content-length');
+    const contentRange = response.headers.get('content-range');
+    const acceptRanges = response.headers.get('accept-ranges');
 
-    if (contentType) headers.set("Content-Type", contentType);
-    if (contentRange) headers.set("Content-Range", contentRange);
-    if (contentLength) headers.set("Content-Length", contentLength);
+    if (contentType) responseHeaders.set('Content-Type', contentType);
+    if (contentLength) responseHeaders.set('Content-Length', contentLength);
+    if (contentRange) responseHeaders.set('Content-Range', contentRange);
+    if (acceptRanges) responseHeaders.set('Accept-Ranges', acceptRanges);
 
     return new NextResponse(response.body, {
       status: response.status,
-      headers,
+      headers: responseHeaders,
     });
-  } catch (error) {
-    return new NextResponse("Error proxying video stream", { status: 500 });
+  } catch (error: any) {
+    console.error('Proxy error:', error);
+    return new NextResponse(`Proxy server error: ${error.message}`, {
+      status: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
   }
 }
