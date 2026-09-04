@@ -5,8 +5,8 @@ export async function OPTIONS() {
     status: 200,
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Range',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS, HEAD',
+      'Access-Control-Allow-Headers': '*',
     },
   });
 }
@@ -20,63 +20,73 @@ export async function GET(request: NextRequest) {
       return new NextResponse('Missing "url" parameter', { status: 400 });
     }
 
-    // Unwrap nested proxy loops
+    // Unwrap nested proxy loops if present
     while (targetUrl.includes('/api/proxy-video?url=')) {
       const parts = targetUrl.split('/api/proxy-video?url=');
       targetUrl = decodeURIComponent(parts[parts.length - 1]);
     }
 
+    targetUrl = targetUrl.trim();
     const range = request.headers.get('range');
 
-    const fetchHeaders: Record<string, string> = {
+    const headers: Record<string, string> = {
       'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      Accept: 'video/webm,video/mp4,video/*;q=0.9,*/*;q=0.8',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      Accept: '*/*',
+      'Accept-Encoding': 'identity',
     };
 
     if (range) {
-      fetchHeaders['Range'] = range;
+      headers['Range'] = range;
     }
 
-    const response = await fetch(targetUrl, {
-      headers: fetchHeaders,
+    // Attempt 1: Fetch through serverless proxy
+    let res = await fetch(targetUrl, {
+      method: 'GET',
+      headers,
+      redirect: 'follow',
       cache: 'no-store',
     });
 
-    if (!response.ok) {
-      return new NextResponse(`Media stream error: ${response.statusText}`, {
-        status: response.status,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-        },
+    // Attempt 2: If custom headers caused a 403, retry with standard request
+    if (!res.ok && res.status === 403) {
+      res = await fetch(targetUrl, {
+        method: 'GET',
+        cache: 'no-store',
+        redirect: 'follow',
       });
+    }
+
+    // Fallback: If target storage bucket blocks cloud IPs, issue a 302 redirect directly to source
+    if (!res.ok) {
+      return NextResponse.redirect(targetUrl, { status: 302 });
     }
 
     const responseHeaders = new Headers();
     responseHeaders.set('Access-Control-Allow-Origin', '*');
-    responseHeaders.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    responseHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Range');
+    responseHeaders.set('Access-Control-Allow-Methods', 'GET, OPTIONS, HEAD');
+    responseHeaders.set('Access-Control-Allow-Headers', '*');
+    responseHeaders.set('Cache-Control', 'public, max-age=3600');
 
-    const contentType = response.headers.get('content-type') || 'video/mp4';
-    const contentLength = response.headers.get('content-length');
-    const contentRange = response.headers.get('content-range');
-    const acceptRanges = response.headers.get('accept-ranges');
+    const contentType = res.headers.get('content-type') || 'video/mp4';
+    const contentLength = res.headers.get('content-length');
+    const contentRange = res.headers.get('content-range');
+    const acceptRanges = res.headers.get('accept-ranges') || 'bytes';
 
     responseHeaders.set('Content-Type', contentType);
     if (contentLength) responseHeaders.set('Content-Length', contentLength);
     if (contentRange) responseHeaders.set('Content-Range', contentRange);
     if (acceptRanges) responseHeaders.set('Accept-Ranges', acceptRanges);
 
-    return new NextResponse(response.body, {
-      status: response.status,
+    return new NextResponse(res.body, {
+      status: res.status,
       headers: responseHeaders,
     });
   } catch (error: any) {
+    console.error('Proxy handler error:', error);
     return new NextResponse(`Proxy server error: ${error.message}`, {
       status: 500,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-      },
+      headers: { 'Access-Control-Allow-Origin': '*' },
     });
   }
 }
