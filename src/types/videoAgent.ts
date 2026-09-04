@@ -16,10 +16,26 @@ export interface BRollSuggestion {
   seconds: number;
 }
 
+export interface RecommendedCut {
+  id: string;
+  startTime: number | string;
+  endTime: number | string;
+  start_time?: number;
+  end_time?: number;
+  secondsStart?: number;
+  secondsEnd?: number;
+  duration?: string | number;
+  reason?: string;
+  headline?: string;
+  subtext?: string;
+  label?: string;
+  action?: 'keep' | 'cut' | 'trim' | string;
+}
+
 export interface EditPlan {
   version: string;
   summary: string;
-  recommended_cuts: any[];
+  recommended_cuts: RecommendedCut[];
   b_roll_suggestions: BRollSuggestion[];
   popups: MatchedPopup[];
   createdAt: string;
@@ -60,7 +76,9 @@ export interface ChatMessage {
   planSnapshot?: EditPlan;
 }
 
-const N8N_WEBHOOK_URL = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/d74024e6-ba1f-4b16-9ae5-40dd6c32dbca';
+const N8N_WEBHOOK_URL =
+  process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL ||
+  'http://localhost:5678/webhook/d74024e6-ba1f-4b16-9ae5-40dd6c32dbca';
 
 /**
  * Fallback parser to extract JSON objects from plain text or Markdown blocks (```json ... ```)
@@ -124,7 +142,8 @@ function normalizePlanPayload(data: any, fallbackPlan: EditPlan | null = null): 
     const parsed = parsePlanFromText(sourceData);
     if (parsed) sourceData = parsed;
   } else if (typeof sourceData === 'object') {
-    const candidateText = sourceData.output || sourceData.text || sourceData.response || sourceData.result;
+    const candidateText =
+      sourceData.output || sourceData.text || sourceData.response || sourceData.result;
     if (typeof candidateText === 'string') {
       const parsed = parsePlanFromText(candidateText);
       if (parsed) {
@@ -133,34 +152,39 @@ function normalizePlanPayload(data: any, fallbackPlan: EditPlan | null = null): 
     }
   }
 
-  const rawPlan = sourceData?.plan || sourceData?.output || (
-    sourceData?.recommended_cuts || sourceData?.b_roll_suggestions || sourceData?.popups || sourceData?.matched_popups || sourceData?.props 
-      ? sourceData 
-      : {}
-  );
+  const rawPlan =
+    sourceData?.plan ||
+    sourceData?.output ||
+    (sourceData?.recommended_cuts ||
+    sourceData?.b_roll_suggestions ||
+    sourceData?.popups ||
+    sourceData?.matched_popups ||
+    sourceData?.props
+      ? sourceData
+      : {});
 
-  let rawPopups: any[] = 
-    rawPlan.popups || 
-    rawPlan.matched_popups || 
-    rawPlan.props || 
-    sourceData?.popups || 
-    sourceData?.matched_popups || 
-    sourceData?.props || 
+  let rawPopups: any[] =
+    rawPlan.popups ||
+    rawPlan.matched_popups ||
+    rawPlan.props ||
+    sourceData?.popups ||
+    sourceData?.matched_popups ||
+    sourceData?.props ||
     (fallbackPlan?.popups?.length ? fallbackPlan.popups : []);
 
-  let rawBRoll: any[] = 
-    rawPlan.b_roll_suggestions || 
-    rawPlan.broll || 
-    sourceData?.b_roll_suggestions || 
-    sourceData?.broll || 
+  let rawBRoll: any[] =
+    rawPlan.b_roll_suggestions ||
+    rawPlan.broll ||
+    sourceData?.b_roll_suggestions ||
+    sourceData?.broll ||
     (fallbackPlan?.b_roll_suggestions?.length ? fallbackPlan.b_roll_suggestions : []);
 
-  let rawCuts: any[] = 
-    rawPlan.recommended_cuts || 
-    rawPlan.cuts || 
-    rawPlan.timeline_cuts || 
-    sourceData?.recommended_cuts || 
-    sourceData?.cuts || 
+  let rawCuts: any[] =
+    rawPlan.recommended_cuts ||
+    rawPlan.cuts ||
+    rawPlan.timeline_cuts ||
+    sourceData?.recommended_cuts ||
+    sourceData?.cuts ||
     (fallbackPlan?.recommended_cuts?.length ? fallbackPlan.recommended_cuts : []);
 
   // Auto-detect misplaced popups residing in b_roll_suggestions array
@@ -175,8 +199,14 @@ function normalizePlanPayload(data: any, fallbackPlan: EditPlan | null = null): 
     subtext: p.subtext || p.description || '',
     position: p.position || 'bottom',
     theme: p.theme || 'youtube_shorts',
-    start_time: typeof p.start_time === 'number' ? p.start_time : parseFloat(p.start_time || p.startTime || 0) || 0,
-    end_time: typeof p.end_time === 'number' ? p.end_time : parseFloat(p.end_time || p.endTime || 0) || 0,
+    start_time:
+      typeof p.start_time === 'number'
+        ? p.start_time
+        : parseFloat(p.start_time || p.startTime || 0) || 0,
+    end_time:
+      typeof p.end_time === 'number'
+        ? p.end_time
+        : parseFloat(p.end_time || p.endTime || 0) || 0,
   }));
 
   const b_roll_suggestions: BRollSuggestion[] = rawBRoll.map((b: any, idx: number) => ({
@@ -187,14 +217,42 @@ function normalizePlanPayload(data: any, fallbackPlan: EditPlan | null = null): 
     seconds: typeof b.seconds === 'number' ? b.seconds : parseFloat(b.seconds || 0) || 0,
   }));
 
+  const recommended_cuts: RecommendedCut[] = rawCuts.map((c: any, idx: number) => {
+    const startVal = c.startTime ?? c.start_time ?? c.secondsStart ?? 0;
+    const endVal = c.endTime ?? c.end_time ?? c.secondsEnd ?? 0;
+    const numStart = typeof startVal === 'number' ? startVal : parseFloat(startVal) || 0;
+    const numEnd = typeof endVal === 'number' ? endVal : parseFloat(endVal) || 0;
+    const computedDuration = c.duration || `${Math.max(0, numEnd - numStart).toFixed(1)}s`;
+
+    return {
+      id: c.id || `cut_${Date.now()}_${idx}`,
+      startTime: startVal,
+      endTime: endVal,
+      start_time: numStart,
+      end_time: numEnd,
+      secondsStart: numStart,
+      secondsEnd: numEnd,
+      duration: computedDuration,
+      reason: c.reason || c.description || '',
+      label: c.label || c.headline || '',
+      action: c.action || 'cut',
+    };
+  });
+
   return {
     version: rawPlan.version || sourceData?.version || fallbackPlan?.version || 'Draft v1',
-    summary: rawPlan.summary || sourceData?.summary || sourceData?.message || fallbackPlan?.summary || 'AI Video Analysis Complete.',
+    summary:
+      rawPlan.summary ||
+      sourceData?.summary ||
+      sourceData?.message ||
+      fallbackPlan?.summary ||
+      'AI Video Analysis Complete.',
     transcript: sourceData?.transcript || rawPlan.transcript || fallbackPlan?.transcript || '',
-    recommended_cuts: rawCuts,
+    recommended_cuts,
     b_roll_suggestions,
     popups,
-    createdAt: rawPlan.createdAt || sourceData?.createdAt || fallbackPlan?.createdAt || new Date().toISOString(),
+    createdAt:
+      rawPlan.createdAt || sourceData?.createdAt || fallbackPlan?.createdAt || new Date().toISOString(),
   };
 }
 
@@ -252,7 +310,9 @@ export async function uploadVideo(
         }
       }
     } else {
-      throw new Error(`n8n returned an empty 0-byte response (HTTP ${response.status}). Ensure "Respond to Webhook" node is executed.`);
+      throw new Error(
+        `n8n returned an empty 0-byte response (HTTP ${response.status}). Ensure "Respond to Webhook" node is executed.`
+      );
     }
 
     if (!response.ok) {
@@ -320,7 +380,9 @@ export async function sendFeedback(
         }
       }
     } else {
-      throw new Error(`n8n returned an empty 0-byte response (HTTP ${response.status}). Ensure "Respond to Webhook" node is executed.`);
+      throw new Error(
+        `n8n returned an empty 0-byte response (HTTP ${response.status}). Ensure "Respond to Webhook" node is executed.`
+      );
     }
 
     if (!response.ok) {
@@ -355,7 +417,9 @@ export async function approvePlan(
       success: true,
       message: '[Mock Mode] Plan approved! Simulated rendering completed.',
       plan: { ...plan, version: 'Approved' },
-      renderedVideoUrl: videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+      renderedVideoUrl:
+        videoUrl ||
+        'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
     };
   }
 
@@ -388,7 +452,9 @@ export async function approvePlan(
         }
       }
     } else {
-      throw new Error(`n8n returned an empty 0-byte response (HTTP ${response.status}). Ensure "Respond to Webhook" node is executed.`);
+      throw new Error(
+        `n8n returned an empty 0-byte response (HTTP ${response.status}). Ensure "Respond to Webhook" node is executed.`
+      );
     }
 
     if (!response.ok) {

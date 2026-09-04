@@ -18,7 +18,9 @@ export const TimelineCutCard: React.FC<TimelineCutCardProps> = ({
 }) => {
   const handleCardClick = () => {
     if (onSeekToCut) {
-      const seconds = cut.secondsStart ?? parseTimecodeToSeconds(cut.startTime);
+      const seconds =
+        cut.secondsStart ??
+        parseTimecodeToSeconds(String(cut.startTime ?? 0));
       onSeekToCut(seconds);
     }
   };
@@ -41,7 +43,7 @@ export const TimelineCutCard: React.FC<TimelineCutCardProps> = ({
         {/* Duration Badge */}
         <div className="flex items-center gap-1 text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
           <Clock className="w-3 h-3 text-emerald-400" />
-          <span>{cut.duration}</span>
+          <span>{cut.duration ?? '0s'}</span>
         </div>
       </div>
 
