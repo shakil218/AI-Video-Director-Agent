@@ -8,110 +8,84 @@ import { EditPlanPanel } from '@/components/plan/EditPlanPanel';
 import { ChatMessage, EditPlan } from '@/types/videoAgent';
 import { generateSessionId } from '@/utils/formatTime';
 import { uploadVideo, sendFeedback, approvePlan } from '@/services/api';
-import { Sparkles, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Sparkles, Info, CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react';
 
 export default function VideoDirectorDashboard() {
-  // Required React States
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentPlan, setCurrentPlan] = useState<EditPlan | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  
-  // App & UX states
-  const [isMockMode, setIsMockMode] = useState<boolean>(true);
+  const [isMockMode, setIsMockMode] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
 
-  // Video Ref for seek controls from cut card clicks
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  // Initialize session ID on client mount
   useEffect(() => {
     setSessionId(generateSessionId());
   }, []);
 
-  // Cleanup Blob URL when file changes
-  useEffect(() => {
-    return () => {
-      if (videoUrl) {
-        URL.revokeObjectURL(videoUrl);
-      }
-    };
-  }, [videoUrl]);
-
-  // Show auto-expiring toast notifications
   const showToast = (text: string, type: 'success' | 'info' | 'error' = 'info') => {
     setToastMessage({ text, type });
     setTimeout(() => setToastMessage(null), 4500);
   };
 
-  // Handle local video file selection
   const handleFileSelect = (file: File) => {
     setVideoFile(file);
-    if (videoUrl) {
-      URL.revokeObjectURL(videoUrl);
-    }
-    const newUrl = URL.createObjectURL(file);
-    setVideoUrl(newUrl);
-    
-    // Add system notification message in chat
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `msg_${Date.now()}`,
-        sender: 'system',
-        text: `Source video file "${file.name}" loaded into player. Click "Analyze Video" to extract audio transcript.`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-    ]);
-
-    showToast(`Loaded ${file.name}. Ready for AI video analysis.`, 'info');
+    const localBlobUrl = URL.createObjectURL(file);
+    setVideoUrl(localBlobUrl);
+    showToast(`Loaded "${file.name}". Click "Analyze Video" to process.`, 'success');
   };
 
-  // Trigger Action 1: "upload"
   const handleAnalyzeVideo = async () => {
     if (!videoFile) return;
 
     setIsProcessing(true);
-    showToast('Uploading video and analyzing audio transcript...', 'info');
+    showToast('Uploading video to n8n pipeline...', 'info');
 
     try {
       const res = await uploadVideo(videoFile, sessionId, isMockMode);
 
-      if (res.success && res.plan) {
-        setCurrentPlan(res.plan);
+      if (res.success) {
+        if (res.videoUrl && res.videoUrl.startsWith('http')) {
+          setVideoUrl(res.videoUrl);
+        }
+
+        if (res.plan) {
+          setCurrentPlan(res.plan);
+        }
+
         setMessages((prev) => [
           ...prev,
           {
-            id: `msg_${Date.now()}`,
+            id: `msg_ai_${Date.now()}`,
             sender: 'ai',
             text: res.message,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             planSnapshot: res.plan,
           },
         ]);
-        showToast('Video analyzed! Edit plan draft generated.', 'success');
+
+        showToast('Video analyzed successfully!', 'success');
       } else {
-        showToast('Failed to analyze video. Please check your connection.', 'error');
+        showToast('Failed to analyze video. Check n8n webhook connection.', 'error');
       }
     } catch (err) {
-      console.error(err);
-      showToast('Error sending upload request to n8n webhook.', 'error');
+      console.error('Analyze Video Error:', err);
+      showToast('Error communicating with n8n webhook.', 'error');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Trigger Action 2: "feedback"
   const handleSendFeedback = async (userText: string) => {
     if (!userText.trim()) return;
 
     const userMsgId = `msg_user_${Date.now()}`;
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // Append user message immediately to chat feed
     setMessages((prev) => [
       ...prev,
       {
@@ -127,8 +101,11 @@ export default function VideoDirectorDashboard() {
     try {
       const res = await sendFeedback(sessionId, userText, currentPlan, isMockMode);
 
-      if (res.success && res.plan) {
-        setCurrentPlan(res.plan);
+      if (res.success) {
+        if (res.plan) {
+          setCurrentPlan(res.plan);
+        }
+
         setMessages((prev) => [
           ...prev,
           {
@@ -139,24 +116,23 @@ export default function VideoDirectorDashboard() {
             planSnapshot: res.plan,
           },
         ]);
-        showToast(`Edit plan updated to ${res.plan.version}!`, 'success');
+        showToast('Feedback processed by AI agent!', 'success');
       } else {
         showToast('Unable to process revision.', 'error');
       }
     } catch (err) {
-      console.error(err);
+      console.error('Feedback Error:', err);
       showToast('Error communicating with n8n feedback webhook.', 'error');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Trigger Action 3: "approve"
   const handleApproveAndRender = async () => {
     if (!currentPlan) return;
 
     setIsProcessing(true);
-    showToast('Plan approved! Triggering FFmpeg background video render in n8n...', 'info');
+    showToast('Plan approved! Triggering Remotion render...', 'info');
 
     try {
       const res = await approvePlan(sessionId, currentPlan, isMockMode, videoUrl);
@@ -172,23 +148,22 @@ export default function VideoDirectorDashboard() {
           {
             id: `msg_ai_approved_${Date.now()}`,
             sender: 'ai',
-            text: `🎉 ${res.message}`,
+            text: res.message,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           },
         ]);
-        showToast('Video render completed successfully!', 'success');
+        showToast('Video render completed!', 'success');
       } else {
         showToast('Approve signal failed to process.', 'error');
       }
     } catch (err) {
-      console.error(err);
-      showToast('Error connecting to n8n approval webhook.', 'error');
+      console.error('Render Error:', err);
+      showToast('Error connecting to approval webhook.', 'error');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Seek video preview player to specific timecode when clicking cut card
   const handleSeekToTimecode = (seconds: number) => {
     if (videoRef.current) {
       videoRef.current.currentTime = seconds;
@@ -197,39 +172,41 @@ export default function VideoDirectorDashboard() {
     }
   };
 
-  // Reset Session
   const handleResetSession = () => {
     setSessionId(generateSessionId());
     setVideoFile(null);
-    if (videoUrl) {
-      URL.revokeObjectURL(videoUrl);
-      setVideoUrl(null);
-    }
+    setVideoUrl(null);
     setMessages([]);
     setCurrentPlan(null);
     setRenderedVideoUrl(null);
     showToast('Initialized new video editing session.', 'info');
   };
 
+  const remotionStudioUrl = videoUrl && videoUrl.startsWith('http') && !videoUrl.includes('localhost') && !videoUrl.startsWith('blob:')
+    ? `https://reel-engine-web-studio.vercel.app/MainReel?props=${encodeURIComponent(
+        JSON.stringify({
+          videoUrl,
+          popups: currentPlan?.popups || [],
+        })
+      )}`
+    : null;
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-emerald-500 selection:text-slate-950">
-      {/* Top Header Bar */}
       <TopHeader
-        sessionId={sessionId}
         isMockMode={isMockMode}
         onToggleMockMode={() => {
           setIsMockMode(!isMockMode);
           showToast(
-            `Switched to ${!isMockMode ? 'Mock API mode' : 'n8n Webhook mode (http://localhost:5678/webhook/video-agent)'}`,
+            `Switched to ${!isMockMode ? 'Mock API mode' : 'n8n Live Webhook mode'}`,
             'info'
           );
         }}
+        sessionId={sessionId}
         onResetSession={handleResetSession}
       />
 
-      {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Toast Notification Alert Banner */}
         {toastMessage && (
           <div
             className={`flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border text-xs font-semibold shadow-lg backdrop-blur-md transition-all animate-fadeIn ${
@@ -259,45 +236,56 @@ export default function VideoDirectorDashboard() {
           </div>
         )}
 
-        {/* Section A: Top Bar / Video Ingestion Header */}
+        {remotionStudioUrl && (
+          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+            <span className="text-xs text-slate-300 font-medium">
+              Live Remotion Studio Sync Active
+            </span>
+            <a
+              href={remotionStudioUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/20 transition-all"
+            >
+              Open Remotion Studio <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        )}
+
         <section>
           <VideoIngestion
-            videoFile={videoFile}
-            videoUrl={videoUrl}
-            onFileSelect={handleFileSelect}
-            onAnalyzeVideo={handleAnalyzeVideo}
-            isProcessing={isProcessing}
             hasPlan={!!currentPlan}
+            isProcessing={isProcessing}
+            onAnalyzeVideo={handleAnalyzeVideo}
+            onFileSelect={handleFileSelect}
+            videoFile={videoFile}
             videoRef={videoRef}
+            videoUrl={videoUrl}
           />
         </section>
 
-        {/* 2-Column Grid Layout for Left & Right Panels */}
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Section B: Left Panel (Interactive Chat & Revisions) */}
           <div className="lg:col-span-6 xl:col-span-6 h-full">
             <ChatPanel
+              hasVideoLoaded={!!videoFile}
+              isProcessing={isProcessing}
               messages={messages}
               onSendFeedback={handleSendFeedback}
-              isProcessing={isProcessing}
-              hasVideoLoaded={!!videoFile}
             />
           </div>
 
-          {/* Section C: Right Panel (Edit Plan Review) */}
           <div className="lg:col-span-6 xl:col-span-6 h-full">
             <EditPlanPanel
-              plan={currentPlan}
-              onApproveAndRender={handleApproveAndRender}
               isProcessing={isProcessing}
+              onApproveAndRender={handleApproveAndRender}
               onSeekToTimecode={handleSeekToTimecode}
+              plan={currentPlan}
               renderedVideoUrl={renderedVideoUrl}
             />
           </div>
         </section>
       </main>
 
-      {/* Sleek Footer */}
       <footer className="w-full border-t border-slate-800/80 bg-slate-950 py-4 px-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="flex items-center gap-1.5 font-medium">
@@ -305,7 +293,7 @@ export default function VideoDirectorDashboard() {
             AI Video Director Agent • Powered by Next.js, Tailwind CSS & n8n Automation
           </p>
           <span className="font-mono text-[11px] text-slate-600">
-            Endpoint: http://localhost:5678/webhook/video-agent
+            Endpoint: {process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/video-agent'}
           </span>
         </div>
       </footer>

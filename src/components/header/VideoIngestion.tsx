@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import { UploadCloud, Film, Play, Pause, RotateCcw, Sparkles, CheckCircle2, FileVideo, AlertCircle } from 'lucide-react';
 import { formatFileSize, formatSecondsToTimecode } from '@/utils/formatTime';
 
@@ -93,19 +93,24 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
     }
   };
 
+  const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    if (videoFile) {
+      const fallbackUrl = URL.createObjectURL(videoFile);
+      e.currentTarget.src = fallbackUrl;
+    }
+  };
+
   return (
     <div className="w-full bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl backdrop-blur-sm transition-all hover:border-slate-700/80">
       <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-        {/* File Dropzone / Video Player area */}
         <div className="w-full lg:w-3/5 flex flex-col gap-3">
           {!videoUrl ? (
-            /* File Upload Dropzone */
             <div
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
-              className={`relative flex flex-col items-center justify-center min-h-[200px] sm:min-h-[220px] rounded-xl border-2 border-dashed p-6 text-center cursor-pointer transition-all duration-300 ${
+              className={`relative flex flex-col items-center justify-center min-h-50 sm:min-h-55 rounded-xl border-2 border-dashed p-6 text-center cursor-pointer transition-all duration-300 ${
                 isDragOver
                   ? 'border-emerald-400 bg-emerald-500/10 scale-[1.01]'
                   : 'border-slate-700/80 bg-slate-950/60 hover:border-emerald-500/50 hover:bg-slate-900/90'
@@ -133,21 +138,19 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
               </div>
             </div>
           ) : (
-            /* HTML5 Video Player */
             <div className="relative w-full rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shadow-2xl group">
               <video
                 ref={videoRef}
                 src={videoUrl}
+                onError={handleVideoError}
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={handleLoadedMetadata}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
-                className="w-full max-h-[300px] object-contain bg-black"
+                className="w-full max-h-75 object-contain bg-black"
               />
 
-              {/* Video Overlay Control Bar */}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent p-3 flex flex-col gap-2 transition-opacity opacity-90 group-hover:opacity-100">
-                {/* Seek Slider */}
+              <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-slate-950 via-slate-950/90 to-transparent p-3 flex flex-col gap-2 transition-opacity opacity-90 group-hover:opacity-100">
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-mono text-emerald-400 w-12 text-right">
                     {formatSecondsToTimecode(currentTime)}
@@ -166,7 +169,6 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
                   </span>
                 </div>
 
-                {/* Control Actions */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <button
@@ -207,7 +209,6 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
           )}
         </div>
 
-        {/* Video Info & Action Section */}
         <div className="w-full lg:w-2/5 flex flex-col justify-between h-full gap-4">
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -221,7 +222,7 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
               <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-400">File Name:</span>
-                  <span className="font-mono text-slate-200 font-medium truncate max-w-[180px]">
+                  <span className="font-mono text-slate-200 font-medium truncate max-w-45">
                     {videoFile.name}
                   </span>
                 </div>
@@ -238,13 +239,12 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
               </div>
             ) : (
               <div className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/60 text-xs text-slate-500 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-slate-600 flex-shrink-0" />
+                <AlertCircle className="w-4 h-4 text-slate-600 shrink-0" />
                 <span>No video file loaded yet. Drop an .mp4 file to preview & analyze.</span>
               </div>
             )}
           </div>
 
-          {/* Action Trigger Button */}
           <div className="pt-2">
             <button
               onClick={onAnalyzeVideo}
@@ -254,7 +254,7 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
                   ? 'bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed'
                   : hasPlan
                   ? 'bg-emerald-600/20 border border-emerald-500/50 text-emerald-300 hover:bg-emerald-600/30 shadow-emerald-500/10'
-                  : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 text-slate-950 hover:brightness-110 shadow-emerald-500/25 active:scale-[0.99]'
+                  : 'bg-linear-to-r from-emerald-500 via-teal-500 to-emerald-400 text-slate-950 hover:brightness-110 shadow-emerald-500/25 active:scale-[0.99]'
               }`}
             >
               {isProcessing ? (
