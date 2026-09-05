@@ -1,5 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+function unwrapProxyUrl(rawUrl: string): string {
+  let url = rawUrl.trim();
+  let prev = '';
+  while (url !== prev) {
+    prev = url;
+    try {
+      url = decodeURIComponent(url);
+    } catch {
+      // Keep going if string is already fully decoded
+    }
+    const match = url.match(/proxy-video\?url=(.+)$/i);
+    if (match && match[1]) {
+      url = match[1].trim();
+    }
+  }
+  return url;
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
@@ -14,19 +32,15 @@ export async function OPTIONS() {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    let targetUrl = searchParams.get('url');
+    const rawTargetUrl = searchParams.get('url');
 
-    if (!targetUrl) {
+    if (!rawTargetUrl) {
       return new NextResponse('Missing "url" parameter', { status: 400 });
     }
 
-    // Unwrap nested proxy loops if present
-    while (targetUrl.includes('/api/proxy-video?url=')) {
-      const parts = targetUrl.split('/api/proxy-video?url=');
-      targetUrl = decodeURIComponent(parts[parts.length - 1]);
-    }
+    // Recursively unwrap nested proxy loops regardless of leading domain/path format
+    const targetUrl = unwrapProxyUrl(rawTargetUrl);
 
-    targetUrl = targetUrl.trim();
     const range = request.headers.get('range');
 
     const headers: Record<string, string> = {
@@ -40,7 +54,7 @@ export async function GET(request: NextRequest) {
       headers['Range'] = range;
     }
 
-    // Attempt 1: Fetch through serverless proxy
+    // Attempt 1: Fetch through serverless proxy with range header
     let res = await fetch(targetUrl, {
       method: 'GET',
       headers,
@@ -48,7 +62,7 @@ export async function GET(request: NextRequest) {
       cache: 'no-store',
     });
 
-    // Attempt 2: If custom headers caused a 403, retry with standard request
+    // Attempt 2: Retry without custom user-agent headers if forbidden
     if (!res.ok && res.status === 403) {
       res = await fetch(targetUrl, {
         method: 'GET',
@@ -57,7 +71,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Fallback: If target storage bucket blocks cloud IPs, issue a 302 redirect directly to source
+    // Fallback: Redirect directly to origin if proxying fails
     if (!res.ok) {
       return NextResponse.redirect(targetUrl, { status: 302 });
     }

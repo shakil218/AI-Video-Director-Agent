@@ -10,6 +10,8 @@ import { generateSessionId } from '@/utils/formatTime';
 import { uploadVideo, sendFeedback, approvePlan } from '@/services/api';
 import { Sparkles, Info, CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react';
 
+type EngineStatus = 'idle' | 'starting' | 'ready';
+
 export default function VideoDirectorDashboard() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -17,6 +19,7 @@ export default function VideoDirectorDashboard() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentPlan, setCurrentPlan] = useState<EditPlan | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [engineStatus, setEngineStatus] = useState<EngineStatus>('idle');
   const [isMockMode, setIsMockMode] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
@@ -32,11 +35,50 @@ export default function VideoDirectorDashboard() {
     setTimeout(() => setToastMessage(null), 4500);
   };
 
+  const pollRenderEngine = async () => {
+    const remotionServer = process.env.NEXT_PUBLIC_REMOTION_SERVER_URL;
+    if (!remotionServer || isMockMode) {
+      setEngineStatus('ready');
+      return;
+    }
+
+    setEngineStatus('starting');
+    showToast('Starting Remotion Render Engine on Render...', 'info');
+
+    const checkHealth = async () => {
+      try {
+        const response = await fetch(`${remotionServer.replace(/\/$/, '')}/health`, {
+          method: 'GET',
+          cache: 'no-store',
+        });
+        if (response.ok) {
+          setEngineStatus('ready');
+          showToast('Engine ready! You can now analyze the video.', 'success');
+          return true;
+        }
+      } catch (err) {
+        // Cold start or server booting
+      }
+      return false;
+    };
+
+    const isAlreadyReady = await checkHealth();
+    if (isAlreadyReady) return;
+
+    const intervalId = setInterval(async () => {
+      const isReady = await checkHealth();
+      if (isReady) {
+        clearInterval(intervalId);
+      }
+    }, 3000);
+  };
+
   const handleFileSelect = (file: File) => {
     setVideoFile(file);
     const localBlobUrl = URL.createObjectURL(file);
     setVideoUrl(localBlobUrl);
-    showToast(`Loaded "${file.name}". Click "Analyze Video" to process.`, 'success');
+    showToast(`Loaded "${file.name}". Warming up render engine...`, 'info');
+    pollRenderEngine();
   };
 
   const handleAnalyzeVideo = async () => {
@@ -179,6 +221,7 @@ export default function VideoDirectorDashboard() {
     setMessages([]);
     setCurrentPlan(null);
     setRenderedVideoUrl(null);
+    setEngineStatus('idle');
     showToast('Initialized new video editing session.', 'info');
   };
 
@@ -255,7 +298,8 @@ export default function VideoDirectorDashboard() {
         <section>
           <VideoIngestion
             hasPlan={!!currentPlan}
-            isProcessing={isProcessing}
+            isProcessing={isProcessing || engineStatus === 'starting'}
+            engineStatus={engineStatus}
             onAnalyzeVideo={handleAnalyzeVideo}
             onFileSelect={handleFileSelect}
             videoFile={videoFile}

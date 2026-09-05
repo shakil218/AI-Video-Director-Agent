@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { UploadCloud, Film, Play, Pause, RotateCcw, Sparkles, CheckCircle2, FileVideo, AlertCircle } from 'lucide-react';
+import { UploadCloud, Film, Play, Pause, RotateCcw, Sparkles, CheckCircle2, FileVideo, AlertCircle, Loader2 } from 'lucide-react';
 import { formatFileSize, formatSecondsToTimecode } from '@/utils/formatTime';
+
+export type EngineStatus = 'idle' | 'starting' | 'ready';
 
 interface VideoIngestionProps {
   videoFile: File | null;
@@ -12,6 +14,7 @@ interface VideoIngestionProps {
   isProcessing: boolean;
   hasPlan: boolean;
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  engineStatus?: EngineStatus;
 }
 
 export const VideoIngestion: React.FC<VideoIngestionProps> = ({
@@ -22,6 +25,7 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
   isProcessing,
   hasPlan,
   videoRef,
+  engineStatus = 'idle',
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -99,6 +103,9 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
       e.currentTarget.src = fallbackUrl;
     }
   };
+
+  const isEngineStarting = engineStatus === 'starting';
+  const isButtonDisabled = !videoFile || isProcessing || isEngineStarting;
 
   return (
     <div className="w-full bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl backdrop-blur-sm transition-all hover:border-slate-700/80">
@@ -248,16 +255,21 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
           <div className="pt-2">
             <button
               onClick={onAnalyzeVideo}
-              disabled={!videoFile || isProcessing}
+              disabled={isButtonDisabled}
               className={`w-full relative flex items-center justify-center gap-2.5 py-3 px-5 rounded-xl font-bold text-sm transition-all duration-300 shadow-lg ${
-                !videoFile || isProcessing
+                isButtonDisabled
                   ? 'bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed'
                   : hasPlan
                   ? 'bg-emerald-600/20 border border-emerald-500/50 text-emerald-300 hover:bg-emerald-600/30 shadow-emerald-500/10'
                   : 'bg-linear-to-r from-emerald-500 via-teal-500 to-emerald-400 text-slate-950 hover:brightness-110 shadow-emerald-500/25 active:scale-[0.99]'
               }`}
             >
-              {isProcessing ? (
+              {isEngineStarting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                  <span>Starting Engine (Render Cold Start)...</span>
+                </>
+              ) : isProcessing ? (
                 <>
                   <Sparkles className="w-4 h-4 animate-spin text-emerald-400" />
                   <span>Gemini Analyzing Audio & Speech...</span>
