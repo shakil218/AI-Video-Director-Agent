@@ -40,9 +40,12 @@ export default function Home() {
       const formData = new FormData();
       formData.append('file', videoFile);
       formData.append('sessionId', sessionId);
-      formData.append('action', 'upload'); // Explicit action parameter to prevent fallback node execution
+      formData.append('action', 'upload');
 
-      const response = await fetch(webhookUrl, {
+      // Append action directly as a URL parameter to guarantee n8n receives $json.query.action
+      const url = `${webhookUrl}${webhookUrl.includes('?') ? '&' : '?'}action=upload`;
+
+      const response = await fetch(url, {
         method: 'POST',
         body: formData,
       });
