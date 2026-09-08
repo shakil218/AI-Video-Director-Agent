@@ -86,30 +86,36 @@ export default function Home() {
 
       if (response.ok) {
         const data = await response.json();
-        
-        // Extract overlays/items from n8n structure
+
+        // Unwrap outer array wrapper if present
+        const root = Array.isArray(data) ? data[0] : data;
+
+        // Safely extract popups/overlays from nested paths
         const extractedOverlays: OverlayItem[] = 
-          Array.isArray(data) ? data : 
-          data.overlays || data.editPlan || data.items || [];
+          root?.props?.popups || 
+          root?.popups || 
+          root?.overlays || 
+          root?.items || 
+          [];
 
         setOverlays(extractedOverlays);
         setHasPlan(true);
         setEngineStatus('completed' as EngineStatus);
 
-        // Add initial system chat message
+        // System feedback message
         const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         setChatMessages([
           {
             id: '1',
             sender: 'bot',
             time: now,
-            text: 'Video processed and edit plan generated successfully based on spoken transcript.',
+            text: `Analysis complete! Extracted ${extractedOverlays.length} recommended overlay popups from transcript timing.`,
             badge: 'Plan V1'
           }
         ]);
 
-        if (data.renderedVideoUrl) {
-          setRenderedVideoUrl(data.renderedVideoUrl);
+        if (root?.renderedVideoUrl || root?.props?.videoUrl) {
+          setRenderedVideoUrl(root.renderedVideoUrl || root.props.videoUrl);
         }
       }
     } catch (err) {
@@ -126,7 +132,6 @@ export default function Home() {
 
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
-    // Append user query
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       sender: 'user',
@@ -134,7 +139,6 @@ export default function Home() {
       text: query
     };
 
-    // Simulated bot response acknowledgment
     const botMsg: ChatMessage = {
       id: (Date.now() + 1).toString(),
       sender: 'bot',
@@ -158,7 +162,7 @@ export default function Home() {
     setEngineStatus('idle' as EngineStatus);
   };
 
-  // Tab Filtering logic
+  // Tab Filtering
   const filteredOverlays = overlays.filter((item: OverlayItem) => {
     if (activeTab === 'cuts') return item.type === 'cut';
     if (activeTab === 'broll') return item.type === 'broll';
@@ -359,7 +363,7 @@ export default function Home() {
                 <h2 className="text-sm font-semibold text-slate-200">Edit Plan Review</h2>
               </div>
               <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-mono">
-                {hasPlan ? 'Approved' : 'Awaiting Ingestion'}
+                {hasPlan ? `Approved (${overlays.length} Props)` : 'Awaiting Ingestion'}
               </span>
             </div>
 
@@ -376,7 +380,7 @@ export default function Home() {
                         : 'bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700'
                     }`}
                   >
-                    {tab === 'all' ? `All (${overlays.length})` : `${tab} (${overlays.filter((i: OverlayItem) => tab === 'popups' ? true : i.type === tab.slice(0, -1)).length})`}
+                    {tab === 'all' ? `All (${overlays.length})` : `${tab} (${filteredOverlays.length})`}
                   </button>
                 ))}
               </div>
@@ -391,6 +395,10 @@ export default function Home() {
                   <p className="text-[11px] max-w-xs text-slate-500">
                     Once video analysis completes, your structured cut list, popups, and visual recommendations will appear here.
                   </p>
+                </div>
+              ) : filteredOverlays.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-slate-500 text-xs">
+                  No items found for this filter tab.
                 </div>
               ) : (
                 filteredOverlays.map((item: OverlayItem, index: number) => (
@@ -408,6 +416,11 @@ export default function Home() {
                             {item.position}
                           </span>
                         )}
+                        {item.theme && (
+                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60">
+                            {item.theme}
+                          </span>
+                        )}
                       </div>
                       {item.subtext && (
                         <p className="text-[11px] text-slate-400 leading-snug">
@@ -419,7 +432,7 @@ export default function Home() {
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="font-mono text-[10px] text-emerald-400 bg-emerald-950/50 border border-emerald-800/50 px-2 py-0.5 rounded-md flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        {item.start_time ?? '0'}s - {item.end_time ?? '5'}s
+                        {item.start_time ?? '0'}s - {item.end_time ?? '0'}s
                       </span>
                     </div>
                   </div>
