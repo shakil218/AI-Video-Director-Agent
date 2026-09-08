@@ -12,7 +12,7 @@ export default function Home() {
   const [engineStatus, setEngineStatus] = useState<EngineStatus>('idle');
   const [sessionId, setSessionId] = useState<string>('');
 
-  // Declare missing video ref
+  // Declare video ref
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Generate session ID on client mount to prevent SSR hydration mismatch
@@ -50,6 +50,7 @@ export default function Home() {
       const formData = new FormData();
       formData.append('file', videoFile);
       formData.append('sessionId', sessionId);
+      formData.append('action', 'upload'); // Explicit action parameter to prevent fallback node execution
 
       const response = await fetch(webhookUrl, {
         method: 'POST',
@@ -57,6 +58,7 @@ export default function Home() {
       });
 
       if (response.ok) {
+        const data = await response.json();
         setHasPlan(true);
       }
     } catch (err) {
@@ -158,15 +160,15 @@ export default function Home() {
                 <h2 className="text-sm font-semibold text-slate-200">Edit Plan Review</h2>
               </div>
               <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-mono">
-                {hasPlan ? 'Plan Ready' : 'Awaiting Video'}
+                {hasPlan ? 'Plan Ready' : 'Awaiting Ingestion'}
               </span>
             </div>
 
             <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-500 space-y-2">
               <ListVideo className="w-8 h-8 text-slate-700" />
-              <p className="text-xs font-medium text-slate-400">No Active Edit Plan</p>
+              <p className="text-xs font-medium text-slate-400">No Plan Generated</p>
               <p className="text-[11px] max-w-xs text-slate-500">
-                After video upload & analysis, Gemini will generate timeline cut cards, visual B-roll prompts, and popup overlays here.
+                Once the video analysis completes, your structured cut list, popups, and visual recommendations will appear here.
               </p>
             </div>
           </div>
