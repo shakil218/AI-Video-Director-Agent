@@ -1,6 +1,8 @@
+// src/components/plan/EditPlanPanel.tsx
+
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { EditPlan } from '@/types/videoAgent';
 import { TimelineCutCard } from './TimelineCutCard';
 import { BRollPromptCard } from './BRollPromptCard';
@@ -14,7 +16,36 @@ interface EditPlanPanelProps {
   isProcessing: boolean;
   onSeekToTimecode?: (seconds: number) => void;
   renderedVideoUrl?: string | null;
+  onUpdatePlan?: (updatedPlan: any) => void;
 }
+
+// Helper: Converts internal Docker or local file paths into playable HTTP URLs
+const getPlayableVideoUrl = (rawUrl?: string | null): string | null => {
+  if (!rawUrl) return null;
+
+  const cleanUrl = rawUrl.trim();
+
+  if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+    return cleanUrl;
+  }
+
+  const filename = cleanUrl.split(/[/\\]/).pop();
+  if (filename) {
+    return `http://localhost:5000/media/${filename}`;
+  }
+
+  return cleanUrl;
+};
+
+// Helper: Safely extracts active plan payload regardless of n8n nesting structure
+const getUnwrappedPlan = (rawPlan: any): any => {
+  if (!rawPlan) return null;
+  if (rawPlan.output) return getUnwrappedPlan(rawPlan.output);
+  if (rawPlan.edit_plan) return getUnwrappedPlan(rawPlan.edit_plan);
+  if (rawPlan.data) return getUnwrappedPlan(rawPlan.data);
+  if (rawPlan.json) return getUnwrappedPlan(rawPlan.json);
+  return rawPlan;
+};
 
 export const EditPlanPanel: React.FC<EditPlanPanelProps> = ({
   plan,
@@ -22,60 +53,35 @@ export const EditPlanPanel: React.FC<EditPlanPanelProps> = ({
   isProcessing,
   onSeekToTimecode,
   renderedVideoUrl,
+  onUpdatePlan,
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'cuts' | 'broll' | 'popups'>('all');
   const [popups, setPopups] = useState<any[]>([]);
 
-  // Helper: Converts internal Docker or local file paths into playable HTTP URLs
-  const getPlayableVideoUrl = (rawUrl?: string | null): string | null => {
-    if (!rawUrl) return null;
+  const playableUrl = useMemo(() => getPlayableVideoUrl(renderedVideoUrl), [renderedVideoUrl]);
+  const unwrappedPlan = useMemo(() => getUnwrappedPlan(plan), [plan]);
 
-    let cleanUrl = rawUrl.trim();
+  const cuts: any[] = useMemo(() => {
+    return (
+      unwrappedPlan?.recommended_cuts ||
+      unwrappedPlan?.cuts ||
+      unwrappedPlan?.timeline_cuts ||
+      unwrappedPlan?.recommendedCuts ||
+      []
+    );
+  }, [unwrappedPlan]);
 
-    // Direct HTTP/HTTPS link is ready to stream
-    if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
-      return cleanUrl;
-    }
+  const brolls: any[] = useMemo(() => {
+    return (
+      unwrappedPlan?.b_roll_suggestions ||
+      unwrappedPlan?.b_roll ||
+      unwrappedPlan?.broll ||
+      unwrappedPlan?.bRollSuggestions ||
+      []
+    );
+  }, [unwrappedPlan]);
 
-    // Extract filename from Docker container paths (/home/node/.n8n-files/renders/filename.mp4) or Windows paths
-    const filename = cleanUrl.split(/[/\\]/).pop();
-    if (filename) {
-      return `http://localhost:5000/media/${filename}`;
-    }
-
-    return cleanUrl;
-  };
-
-  const playableUrl = getPlayableVideoUrl(renderedVideoUrl);
-
-  // Safely extract active plan payload regardless of n8n nesting structure
-  const getUnwrappedPlan = (rawPlan: any): any => {
-    if (!rawPlan) return null;
-    if (rawPlan.output) return getUnwrappedPlan(rawPlan.output);
-    if (rawPlan.edit_plan) return getUnwrappedPlan(rawPlan.edit_plan);
-    if (rawPlan.data) return getUnwrappedPlan(rawPlan.data);
-    if (rawPlan.json) return getUnwrappedPlan(rawPlan.json);
-    return rawPlan;
-  };
-
-  const unwrappedPlan = getUnwrappedPlan(plan);
-
-  // Safely resolve arrays across different JSON key formats
-  const cuts: any[] =
-    unwrappedPlan?.recommended_cuts ||
-    unwrappedPlan?.cuts ||
-    unwrappedPlan?.timeline_cuts ||
-    unwrappedPlan?.recommendedCuts ||
-    [];
-
-  const brolls: any[] =
-    unwrappedPlan?.b_roll_suggestions ||
-    unwrappedPlan?.b_roll ||
-    unwrappedPlan?.broll ||
-    unwrappedPlan?.bRollSuggestions ||
-    [];
-
-  // Sync popups state safely with multi-key support
+  // Sync popups state safely when unwrappedPlan changes
   useEffect(() => {
     const extractedPopups =
       unwrappedPlan?.popups ||
@@ -85,7 +91,7 @@ export const EditPlanPanel: React.FC<EditPlanPanelProps> = ({
       unwrappedPlan?.matchedPopups ||
       [];
     setPopups(extractedPopups);
-  }, [plan]);
+  }, [unwrappedPlan]);
 
   const getStatusBadgeVariant = (version: string) => {
     if (!version) return 'cyan';
@@ -96,18 +102,22 @@ export const EditPlanPanel: React.FC<EditPlanPanelProps> = ({
 
   const totalItems = cuts.length + brolls.length + popups.length;
 
-  const handleUpdatePopup = (updatedPopup: any, index: number) => {
-    const updatedList = [...popups];
-    updatedList[index] = updatedPopup;
-    setPopups(updatedList);
+  const handleUpdatePopup = useCallback(
+    (updatedPopup: any, index: number) => {
+      const updatedList = [...popups];
+      updatedList[index] = updatedPopup;
+      setPopups(updatedList);
 
-    // Mutate back into unwrappedPlan & plan reference
-    if (unwrappedPlan) {
-      if (unwrappedPlan.popups) unwrappedPlan.popups[index] = updatedPopup;
-      if (unwrappedPlan.matched_popups) unwrappedPlan.matched_popups[index] = updatedPopup;
-      if (unwrappedPlan.props) unwrappedPlan.props[index] = updatedPopup;
-    }
-  };
+      if (onUpdatePlan && unwrappedPlan) {
+        const updatedPlanData = {
+          ...unwrappedPlan,
+          popups: updatedList,
+        };
+        onUpdatePlan(updatedPlanData);
+      }
+    },
+    [popups, unwrappedPlan, onUpdatePlan]
+  );
 
   const planVersion = plan?.version || unwrappedPlan?.version || 'v1.0';
   const planSummary =
@@ -176,6 +186,7 @@ export const EditPlanPanel: React.FC<EditPlanPanelProps> = ({
           {/* Filter Tabs */}
           <div className="flex items-center gap-1 mb-3 bg-slate-950/80 p-1 rounded-xl border border-slate-800/80">
             <button
+              type="button"
               onClick={() => setActiveTab('all')}
               className={`flex-1 py-1 px-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'all'
@@ -186,6 +197,7 @@ export const EditPlanPanel: React.FC<EditPlanPanelProps> = ({
               All ({totalItems})
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('cuts')}
               className={`flex-1 py-1 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
                 activeTab === 'cuts'
@@ -197,6 +209,7 @@ export const EditPlanPanel: React.FC<EditPlanPanelProps> = ({
               Cuts ({cuts.length})
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('broll')}
               className={`flex-1 py-1 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
                 activeTab === 'broll'
@@ -208,6 +221,7 @@ export const EditPlanPanel: React.FC<EditPlanPanelProps> = ({
               B-Roll ({brolls.length})
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('popups')}
               className={`flex-1 py-1 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1 ${
                 activeTab === 'popups'
@@ -231,7 +245,7 @@ export const EditPlanPanel: React.FC<EditPlanPanelProps> = ({
                 </h3>
                 {cuts.map((cut: any, idx: number) => (
                   <TimelineCutCard
-                    key={cut.id || idx}
+                    key={cut.id || `cut-${idx}`}
                     cut={cut}
                     index={idx}
                     onSeekToCut={onSeekToTimecode}
@@ -249,7 +263,7 @@ export const EditPlanPanel: React.FC<EditPlanPanelProps> = ({
                 </h3>
                 {brolls.map((suggestion: any, idx: number) => (
                   <BRollPromptCard
-                    key={suggestion.id || idx}
+                    key={suggestion.id || `broll-${idx}`}
                     suggestion={suggestion}
                     index={idx}
                     onSeekToTimecode={onSeekToTimecode}
@@ -267,7 +281,7 @@ export const EditPlanPanel: React.FC<EditPlanPanelProps> = ({
                 </h3>
                 {popups.map((popup: any, idx: number) => (
                   <PopupCard
-                    key={idx}
+                    key={popup.id || `popup-${idx}`}
                     propItem={popup}
                     index={idx}
                     onSeekToTimecode={onSeekToTimecode}
@@ -324,6 +338,7 @@ export const EditPlanPanel: React.FC<EditPlanPanelProps> = ({
       {/* Primary CTA Button */}
       <div className="pt-3 border-t border-slate-800/80 mt-3">
         <button
+          type="button"
           onClick={onApproveAndRender}
           disabled={!plan || isProcessing || planVersion === 'Approved'}
           className={`w-full relative flex items-center justify-center gap-2 py-3 px-5 rounded-xl font-bold text-sm transition-all duration-300 shadow-xl ${

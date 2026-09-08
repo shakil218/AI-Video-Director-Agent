@@ -1,3 +1,5 @@
+// src/app/page.tsx
+
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -56,6 +58,9 @@ export default function Home() {
   };
 
   const handleFileSelect = (file: File) => {
+    if (videoUrl) {
+      URL.revokeObjectURL(videoUrl);
+    }
     setVideoFile(file);
     const url = URL.createObjectURL(file);
     setVideoUrl(url);
@@ -128,7 +133,6 @@ export default function Home() {
 
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // Append user message immediately
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       sender: 'user',
@@ -144,7 +148,6 @@ export default function Home() {
       const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL;
       if (!webhookUrl) throw new Error('N8N Webhook URL missing');
 
-      // Send revision prompt using FormData to match n8n webhook parsing
       const formData = new FormData();
       formData.append('action', 'revision');
       formData.append('sessionId', sessionId);
@@ -201,6 +204,9 @@ export default function Home() {
   };
 
   const handleNewSession = () => {
+    if (videoUrl) {
+      URL.revokeObjectURL(videoUrl);
+    }
     setSessionId(`session_${Date.now()}`);
     setVideoFile(null);
     setVideoUrl(null);
@@ -246,6 +252,7 @@ export default function Home() {
               {sessionId || 'Initializing...'}
             </span>
             <button
+              type="button"
               onClick={handleNewSession}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 transition-colors"
             >
@@ -304,6 +311,7 @@ export default function Home() {
             )}
 
             <button
+              type="button"
               onClick={handleAnalyzeVideo}
               disabled={!videoFile || isProcessing}
               className="w-full py-2.5 px-4 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors cursor-pointer"
@@ -370,6 +378,7 @@ export default function Home() {
               <div className="flex items-center gap-2 overflow-x-auto pb-1 text-[10px]">
                 <span className="text-slate-500 shrink-0 font-medium">Quick Revisions:</span>
                 <button
+                  type="button"
                   disabled={isProcessing}
                   onClick={() => handleSendRevision('Make cut #2 shorter by 3 seconds')}
                   className="px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 shrink-0 transition-colors cursor-pointer disabled:opacity-50"
@@ -377,6 +386,7 @@ export default function Home() {
                   Make cut #2 shorter by 3 seconds
                 </button>
                 <button
+                  type="button"
                   disabled={isProcessing}
                   onClick={() => handleSendRevision('Add high-tech B-roll overlay at 00:15')}
                   className="px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 shrink-0 transition-colors cursor-pointer disabled:opacity-50"
@@ -396,6 +406,7 @@ export default function Home() {
                   className="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 disabled:opacity-50"
                 />
                 <button
+                  type="button"
                   onClick={() => handleSendRevision()}
                   disabled={isProcessing}
                   className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
@@ -428,6 +439,7 @@ export default function Home() {
               <div className="flex items-center gap-1.5 py-2 text-xs font-mono border-b border-slate-800/60">
                 {(['all', 'cuts', 'broll', 'popups'] as const).map((tab) => (
                   <button
+                    type="button"
                     key={tab}
                     onClick={() => setActiveTab(tab)}
                     className={`px-3 py-1 rounded-lg border transition-all text-[11px] capitalize cursor-pointer ${
@@ -468,12 +480,12 @@ export default function Home() {
                           {item.headline || 'OVERLAY PROMPT'}
                         </span>
                         {item.position && (
-                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
                             {item.position}
                           </span>
                         )}
                         {item.theme && (
-                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60">
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60">
                             {item.theme}
                           </span>
                         )}
