@@ -2,20 +2,19 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { VideoIngestion, EngineStatus } from '@/components/header/VideoIngestion';
-import { MessageSquare, ListVideo, Sparkles, RefreshCw, Radio } from 'lucide-react';
+import { MessageSquare, ListVideo, Sparkles, RefreshCw, Radio, CheckCircle2 } from 'lucide-react';
 
 export default function Home() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [hasPlan, setHasPlan] = useState<boolean>(false);
+  const [planData, setPlanData] = useState<any>(null);
   const [engineStatus, setEngineStatus] = useState<EngineStatus>('idle');
   const [sessionId, setSessionId] = useState<string>('');
 
-  // Declare video ref
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  // Generate session ID on client mount to prevent SSR hydration mismatch
   useEffect(() => {
     setSessionId(`session_${Date.now()}`);
   }, []);
@@ -23,7 +22,6 @@ export default function Home() {
   const handleFileSelect = (file: File) => {
     setVideoFile(file);
     setVideoUrl(URL.createObjectURL(file));
-    // Immediately set engine status to ready without waiting on server cold start pings
     setEngineStatus('ready');
   };
 
@@ -42,7 +40,6 @@ export default function Home() {
       formData.append('sessionId', sessionId);
       formData.append('action', 'upload');
 
-      // Append action directly as a URL parameter to guarantee n8n receives $json.query.action
       const url = `${webhookUrl}${webhookUrl.includes('?') ? '&' : '?'}action=upload`;
 
       const response = await fetch(url, {
@@ -52,6 +49,7 @@ export default function Home() {
 
       if (response.ok) {
         const data = await response.json();
+        setPlanData(data);
         setHasPlan(true);
       }
     } catch (err) {
@@ -66,6 +64,7 @@ export default function Home() {
     setVideoFile(null);
     setVideoUrl(null);
     setHasPlan(false);
+    setPlanData(null);
     setEngineStatus('idle');
   };
 
@@ -136,13 +135,26 @@ export default function Home() {
               </span>
             </div>
 
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-500 space-y-2">
-              <Sparkles className="w-8 h-8 text-slate-700" />
-              <p className="text-xs font-medium text-slate-400">No Dialogue Yet</p>
-              <p className="text-[11px] max-w-xs text-slate-500">
-                Upload your source MP4 video above and click <strong className="text-emerald-400 font-normal">Analyze Video</strong> to start working with the Gemini Director Agent.
-              </p>
-            </div>
+            {hasPlan && planData ? (
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 text-xs text-slate-300">
+                <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+                  <p className="font-semibold text-emerald-400 mb-1 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Analysis Complete
+                  </p>
+                  <p className="text-slate-300 leading-relaxed">
+                    {planData.summary || planData.message || planData.text || 'Edit plan generated successfully based on transcript.'}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-500 space-y-2">
+                <Sparkles className="w-8 h-8 text-slate-700" />
+                <p className="text-xs font-medium text-slate-400">No Dialogue Yet</p>
+                <p className="text-[11px] max-w-xs text-slate-500">
+                  Upload your source MP4 video above and click <strong className="text-emerald-400 font-normal">Analyze Video</strong> to start working with the Gemini Director Agent.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Right: Edit Plan Review */}
@@ -157,13 +169,21 @@ export default function Home() {
               </span>
             </div>
 
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-500 space-y-2">
-              <ListVideo className="w-8 h-8 text-slate-700" />
-              <p className="text-xs font-medium text-slate-400">No Plan Generated</p>
-              <p className="text-[11px] max-w-xs text-slate-500">
-                Once the video analysis completes, your structured cut list, popups, and visual recommendations will appear here.
-              </p>
-            </div>
+            {hasPlan && planData ? (
+              <div className="flex-1 overflow-y-auto p-4">
+                <pre className="text-[11px] font-mono text-emerald-300 bg-slate-950 p-3 rounded-xl border border-slate-800 overflow-x-auto whitespace-pre-wrap">
+                  {JSON.stringify(planData.editPlan || planData.plan || planData, null, 2)}
+                </pre>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-500 space-y-2">
+                <ListVideo className="w-8 h-8 text-slate-700" />
+                <p className="text-xs font-medium text-slate-400">No Plan Generated</p>
+                <p className="text-[11px] max-w-xs text-slate-500">
+                  Once the video analysis completes, your structured cut list, popups, and visual recommendations will appear here.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
