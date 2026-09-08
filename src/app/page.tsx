@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { VideoIngestion, EngineStatus } from '@/components/header/VideoIngestion';
 import { 
   MessageSquare, ListVideo, Sparkles, RefreshCw, Radio, 
-  CheckCircle2, Send, Clock, Film, Play
+  CheckCircle2, Send, Clock, Film, Play, Loader2
 } from 'lucide-react';
 
 interface OverlayItem {
@@ -86,11 +86,8 @@ export default function Home() {
 
       if (response.ok) {
         const data = await response.json();
-
-        // Unwrap outer array wrapper if present
         const root = Array.isArray(data) ? data[0] : data;
 
-        // Safely extract popups/overlays from nested paths
         const extractedOverlays: OverlayItem[] = 
           root?.props?.popups || 
           root?.popups || 
@@ -102,7 +99,6 @@ export default function Home() {
         setHasPlan(true);
         setEngineStatus('completed' as EngineStatus);
 
-        // System feedback message
         const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         setChatMessages([
           {
@@ -126,12 +122,13 @@ export default function Home() {
     }
   };
 
-  const handleSendRevision = (textToSend?: string) => {
+  const handleSendRevision = async (textToSend?: string) => {
     const query = textToSend || revisionInput;
-    if (!query.trim()) return;
+    if (!query.trim() || isProcessing) return;
 
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
+
+    // Append user message immediately
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       sender: 'user',
@@ -139,16 +136,66 @@ export default function Home() {
       text: query
     };
 
-    const botMsg: ChatMessage = {
-      id: (Date.now() + 1).toString(),
-      sender: 'bot',
-      time: now,
-      text: `Revision request received: "${query}". Updated edit plan accordingly.`,
-      badge: 'Draft V2'
-    };
-
-    setChatMessages((prev: ChatMessage[]) => [...prev, userMsg, botMsg]);
+    setChatMessages((prev) => [...prev, userMsg]);
     setRevisionInput('');
+    setIsProcessing(true);
+
+    try {
+      const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL;
+      if (!webhookUrl) throw new Error('N8N Webhook URL missing');
+
+      // Send revision prompt to n8n webhook
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'revision',
+          sessionId: sessionId,
+          prompt: query,
+          currentOverlays: overlays
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const root = Array.isArray(data) ? data[0] : data;
+
+        const extractedOverlays: OverlayItem[] = 
+          root?.props?.popups || 
+          root?.popups || 
+          root?.overlays || 
+          root?.items || 
+          [];
+
+        if (extractedOverlays.length > 0) {
+          setOverlays(extractedOverlays);
+        }
+
+        const botMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          sender: 'bot',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          text: root?.message || `Revision applied! Regenerated edit plan with ${extractedOverlays.length} props.`,
+          badge: 'Draft V2'
+        };
+
+        setChatMessages((prev) => [...prev, botMsg]);
+      } else {
+        throw new Error(`n8n webhook error: ${response.statusText}`);
+      }
+    } catch (err) {
+      console.error('Error executing revision prompt:', err);
+      const errorMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        sender: 'bot',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        text: 'Failed to execute revision request. Please ensure n8n workflow accepts JSON prompt payloads.',
+        badge: 'Error'
+      };
+      setChatMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleNewSession = () => {
@@ -162,7 +209,6 @@ export default function Home() {
     setEngineStatus('idle' as EngineStatus);
   };
 
-  // Tab Filtering
   const filteredOverlays = overlays.filter((item: OverlayItem) => {
     if (activeTab === 'cuts') return item.type === 'cut';
     if (activeTab === 'broll') return item.type === 'broll';
@@ -306,7 +352,7 @@ export default function Home() {
                       </span>
                       <span className="font-mono">{msg.time}</span>
                     </div>
-                    <p>{msg.text}</p>
+                    <p className="whitespace-pre-wrap">{msg.text}</p>
                     {msg.badge && (
                       <span className="inline-block mt-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                         {msg.badge}
@@ -322,14 +368,16 @@ export default function Home() {
               <div className="flex items-center gap-2 overflow-x-auto pb-1 text-[10px]">
                 <span className="text-slate-500 shrink-0 font-medium">Quick Revisions:</span>
                 <button
+                  disabled={isProcessing}
                   onClick={() => handleSendRevision('Make cut #2 shorter by 3 seconds')}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 shrink-0 transition-colors cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 shrink-0 transition-colors cursor-pointer disabled:opacity-50"
                 >
                   Make cut #2 shorter by 3 seconds
                 </button>
                 <button
+                  disabled={isProcessing}
                   onClick={() => handleSendRevision('Add high-tech B-roll overlay at 00:15')}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 shrink-0 transition-colors cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 shrink-0 transition-colors cursor-pointer disabled:opacity-50"
                 >
                   Add high-tech B-roll overlay at 00:15
                 </button>
@@ -339,16 +387,22 @@ export default function Home() {
                 <input
                   type="text"
                   value={revisionInput}
+                  disabled={isProcessing}
                   onChange={(e) => setRevisionInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendRevision()}
-                  placeholder="Request an AI revision (e.g. 'Make cut #2 shorter', 'Add B-roll intro')..."
-                  className="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
+                  placeholder={isProcessing ? "n8n Processing Prompt..." : "Request an AI revision (e.g. 'Match 20 specific props')..."}
+                  className="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 disabled:opacity-50"
                 />
                 <button
                   onClick={() => handleSendRevision()}
-                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  disabled={isProcessing}
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
                 >
-                  <Send className="w-3.5 h-3.5" />
+                  {isProcessing ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
                   Send
                 </button>
               </div>
