@@ -48,7 +48,7 @@ const POSITION_STYLES: Record<string, React.CSSProperties> = {
 
   bottom: { justifyContent: "flex-end", alignItems: "center", paddingBottom: "10vh", paddingLeft: "20px", paddingRight: "20px" },
   "bottom-left": { justifyContent: "flex-end", alignItems: "flex-start", paddingBottom: "10vh", paddingLeft: "30px" },
-  "bottom-right": { justifyContent: "flex-end", alignItems: "flex-end", paddingBottom: "30px" },
+  "bottom-right": { justifyContent: "flex-end", alignItems: "flex-end", paddingBottom: "10vh", paddingRight: "30px" },
 };
 
 const THEME_STYLES: Record<
@@ -118,10 +118,13 @@ const Popup: React.FC<{ popup: PopupData; durationInFrames: number }> = ({
 }) => {
   const frame = useCurrentFrame();
 
-  const fadeFrames = Math.max(1, Math.min(5, Math.floor(durationInFrames / 3)));
+  const safeDuration = Math.max(1, durationInFrames);
+  const fadeFrames = Math.max(1, Math.min(5, Math.floor(safeDuration / 3)));
+  const fadeOutStart = Math.max(fadeFrames, safeDuration - fadeFrames);
+
   const opacity = interpolate(
     frame,
-    [0, fadeFrames, Math.max(fadeFrames, durationInFrames - fadeFrames), durationInFrames],
+    [0, fadeFrames, fadeOutStart, safeDuration],
     [0, 1, 1, 0],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
   );
@@ -163,7 +166,6 @@ export const MainReel: React.FC<MainReelProps> = ({ videoUrl, popups }) => {
 
   let cleanUrl = String(videoUrl || "").trim();
 
-  // FIX: Added !cleanUrl.includes("proxy-video") check to prevent double URL encoding
   if (
     cleanUrl.startsWith("http") &&
     !cleanUrl.includes("localhost") &&
@@ -182,13 +184,16 @@ export const MainReel: React.FC<MainReelProps> = ({ videoUrl, popups }) => {
         const startSec = Number(popup.start_time);
         const endSec = Number(popup.end_time);
 
-        if (!Number.isFinite(startSec) || !Number.isFinite(endSec)) {
+        const hasSecs = Number.isFinite(startSec) && Number.isFinite(endSec);
+        const hasFrames = Number.isFinite(popup.start_frame) && Number.isFinite(popup.end_frame);
+
+        if (!hasSecs && !hasFrames) {
           return null;
         }
 
-        const startFrame = Math.max(0, Math.round(startSec * fps));
-        const endFrame = Math.round(endSec * fps);
-        const durationInFrames = Math.max(1, endFrame - startFrame);
+        const startFrame = popup.start_frame ?? Math.max(0, Math.round(startSec * fps));
+        const endFrame = popup.end_frame ?? Math.round(endSec * fps);
+        const durationInFrames = popup.duration_in_frames ?? Math.max(1, endFrame - startFrame);
 
         return (
           <Sequence

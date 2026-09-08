@@ -1,346 +1,177 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { TopHeader } from '@/components/header/TopHeader';
-import { VideoIngestion } from '@/components/header/VideoIngestion';
-import { ChatPanel } from '@/components/chat/ChatPanel';
-import { EditPlanPanel } from '@/components/plan/EditPlanPanel';
-import { ChatMessage, EditPlan } from '@/types/videoAgent';
-import { generateSessionId } from '@/utils/formatTime';
-import { uploadVideo, sendFeedback, approvePlan } from '@/services/api';
-import { Sparkles, Info, CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { VideoIngestion, EngineStatus } from '@/components/header/VideoIngestion';
+import { MessageSquare, ListVideo, Sparkles, RefreshCw, Radio } from 'lucide-react';
 
-type EngineStatus = 'idle' | 'starting' | 'ready';
-
-export default function VideoDirectorDashboard() {
+export default function Home() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string>('');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [currentPlan, setCurrentPlan] = useState<EditPlan | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [hasPlan, setHasPlan] = useState<boolean>(false);
   const [engineStatus, setEngineStatus] = useState<EngineStatus>('idle');
-  const [isMockMode, setIsMockMode] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
-  const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string>('');
 
+  // Declare missing video ref
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
+  // Generate session ID on client mount to prevent SSR hydration mismatch
   useEffect(() => {
-    setSessionId(generateSessionId());
+    setSessionId(`session_${Date.now()}`);
   }, []);
 
-  const showToast = (text: string, type: 'success' | 'info' | 'error' = 'info') => {
-    setToastMessage({ text, type });
-    setTimeout(() => setToastMessage(null), 4500);
-  };
-
-  const pollRenderEngine = async () => {
-    const remotionServer = process.env.NEXT_PUBLIC_REMOTION_SERVER_URL;
-    if (!remotionServer || isMockMode) {
-      setEngineStatus('ready');
-      return;
-    }
+  const handleFileSelect = async (file: File) => {
+    setVideoFile(file);
+    setVideoUrl(URL.createObjectURL(file));
 
     setEngineStatus('starting');
-    showToast('Starting Remotion Render Engine on Render...', 'info');
-
-    const checkHealth = async () => {
-      try {
-        const response = await fetch(`${remotionServer.replace(/\/$/, '')}/health`, {
-          method: 'GET',
-          cache: 'no-store',
-        });
-        if (response.ok) {
-          setEngineStatus('ready');
-          showToast('Engine ready! You can now analyze the video.', 'success');
-          return true;
-        }
-      } catch (err) {
-        // Cold start or server booting
+    try {
+      const serverUrl = process.env.NEXT_PUBLIC_REMOTION_SERVER_URL;
+      if (serverUrl) {
+        await fetch(`${serverUrl}/health`);
       }
-      return false;
-    };
-
-    const isAlreadyReady = await checkHealth();
-    if (isAlreadyReady) return;
-
-    const intervalId = setInterval(async () => {
-      const isReady = await checkHealth();
-      if (isReady) {
-        clearInterval(intervalId);
-      }
-    }, 3000);
-  };
-
-  const handleFileSelect = (file: File) => {
-    setVideoFile(file);
-    const localBlobUrl = URL.createObjectURL(file);
-    setVideoUrl(localBlobUrl);
-    showToast(`Loaded "${file.name}". Warming up render engine...`, 'info');
-    pollRenderEngine();
+    } catch (error) {
+      console.warn('Render engine warm-up ping failed:', error);
+    } finally {
+      setEngineStatus('ready');
+    }
   };
 
   const handleAnalyzeVideo = async () => {
     if (!videoFile) return;
 
     setIsProcessing(true);
-    showToast('Uploading video to n8n pipeline...', 'info');
-
     try {
-      const res = await uploadVideo(videoFile, sessionId, isMockMode);
+      const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL;
+      if (!webhookUrl) {
+        throw new Error('N8N Webhook URL is missing in environment variables.');
+      }
 
-      if (res.success) {
-        if (res.videoUrl && res.videoUrl.startsWith('http')) {
-          setVideoUrl(res.videoUrl);
-        }
+      const formData = new FormData();
+      formData.append('file', videoFile);
+      formData.append('sessionId', sessionId);
 
-        if (res.plan) {
-          setCurrentPlan(res.plan);
-        }
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        body: formData,
+      });
 
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `msg_ai_${Date.now()}`,
-            sender: 'ai',
-            text: res.message,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            planSnapshot: res.plan,
-          },
-        ]);
-
-        showToast('Video analyzed successfully!', 'success');
-      } else {
-        showToast('Failed to analyze video. Check n8n webhook connection.', 'error');
+      if (response.ok) {
+        setHasPlan(true);
       }
     } catch (err) {
-      console.error('Analyze Video Error:', err);
-      showToast('Error communicating with n8n webhook.', 'error');
+      console.error('Error analyzing video:', err);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleSendFeedback = async (userText: string) => {
-    if (!userText.trim()) return;
-
-    const userMsgId = `msg_user_${Date.now()}`;
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: userMsgId,
-        sender: 'user',
-        text: userText,
-        timestamp,
-      },
-    ]);
-
-    setIsProcessing(true);
-
-    try {
-      const res = await sendFeedback(sessionId, userText, currentPlan, isMockMode);
-
-      if (res.success) {
-        if (res.plan) {
-          setCurrentPlan(res.plan);
-        }
-
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `msg_ai_${Date.now()}`,
-            sender: 'ai',
-            text: res.message,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            planSnapshot: res.plan,
-          },
-        ]);
-        showToast('Feedback processed by AI agent!', 'success');
-      } else {
-        showToast('Unable to process revision.', 'error');
-      }
-    } catch (err) {
-      console.error('Feedback Error:', err);
-      showToast('Error communicating with n8n feedback webhook.', 'error');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleApproveAndRender = async () => {
-    if (!currentPlan) return;
-
-    setIsProcessing(true);
-    showToast('Plan approved! Triggering Remotion render...', 'info');
-
-    try {
-      const res = await approvePlan(sessionId, currentPlan, isMockMode, videoUrl);
-
-      if (res.success) {
-        setCurrentPlan((prev) => (prev ? { ...prev, version: 'Approved' } : null));
-        if (res.renderedVideoUrl) {
-          setRenderedVideoUrl(res.renderedVideoUrl);
-        }
-
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `msg_ai_approved_${Date.now()}`,
-            sender: 'ai',
-            text: res.message,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          },
-        ]);
-        showToast('Video render completed!', 'success');
-      } else {
-        showToast('Approve signal failed to process.', 'error');
-      }
-    } catch (err) {
-      console.error('Render Error:', err);
-      showToast('Error connecting to approval webhook.', 'error');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleSeekToTimecode = (seconds: number) => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = seconds;
-      videoRef.current.play().catch(() => {});
-      showToast(`Jumped to timecode ${seconds}s`, 'info');
-    }
-  };
-
-  const handleResetSession = () => {
-    setSessionId(generateSessionId());
+  const handleNewSession = () => {
+    setSessionId(`session_${Date.now()}`);
     setVideoFile(null);
     setVideoUrl(null);
-    setMessages([]);
-    setCurrentPlan(null);
-    setRenderedVideoUrl(null);
+    setHasPlan(false);
     setEngineStatus('idle');
-    showToast('Initialized new video editing session.', 'info');
   };
 
-  const remotionStudioUrl = videoUrl && videoUrl.startsWith('http') && !videoUrl.includes('localhost') && !videoUrl.startsWith('blob:')
-    ? `https://reel-engine-web-studio.vercel.app/MainReel?props=${encodeURIComponent(
-        JSON.stringify({
-          videoUrl,
-          popups: currentPlan?.popups || [],
-        })
-      )}`
-    : null;
-
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-emerald-500 selection:text-slate-950">
-      <TopHeader
-        isMockMode={isMockMode}
-        onToggleMockMode={() => {
-          setIsMockMode(!isMockMode);
-          showToast(
-            `Switched to ${!isMockMode ? 'Mock API mode' : 'n8n Live Webhook mode'}`,
-            'info'
-          );
-        }}
-        sessionId={sessionId}
-        onResetSession={handleResetSession}
-      />
-
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {toastMessage && (
-          <div
-            className={`flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border text-xs font-semibold shadow-lg backdrop-blur-md transition-all animate-fadeIn ${
-              toastMessage.type === 'success'
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                : toastMessage.type === 'error'
-                ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
-                : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              {toastMessage.type === 'success' ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              ) : toastMessage.type === 'error' ? (
-                <AlertTriangle className="w-4 h-4 text-rose-400" />
-              ) : (
-                <Info className="w-4 h-4 text-cyan-400" />
-              )}
-              <span>{toastMessage.text}</span>
+    <main className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8 font-sans selection:bg-emerald-500 selection:text-slate-950">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                AI Video Director Agent
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 uppercase">
+                  N8N + GEMINI
+                </span>
+              </h1>
             </div>
-            <button
-              onClick={() => setToastMessage(null)}
-              className="text-slate-400 hover:text-slate-200 text-xs font-bold"
-            >
-              ✕
-            </button>
+            <p className="text-xs text-slate-400 mt-1">
+              Autonomous Video Editing & Transcript Optimization Pipeline
+            </p>
           </div>
-        )}
 
-        {remotionStudioUrl && (
-          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
-            <span className="text-xs text-slate-300 font-medium">
-              Live Remotion Studio Sync Active
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-xs text-emerald-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center gap-2 min-w-36 justify-center">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              {sessionId || 'Initializing...'}
             </span>
-            <a
-              href={remotionStudioUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/20 transition-all"
+            <button
+              onClick={handleNewSession}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 transition-colors cursor-pointer"
             >
-              Open Remotion Studio <ExternalLink className="w-3.5 h-3.5" />
-            </a>
+              <RefreshCw className="w-3.5 h-3.5" />
+              New Session
+            </button>
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50 text-xs text-emerald-400 font-mono">
+              <Radio className="w-3.5 h-3.5 animate-pulse" />
+              n8n Webhook
+            </span>
           </div>
-        )}
+        </header>
 
-        <section>
-          <VideoIngestion
-            hasPlan={!!currentPlan}
-            isProcessing={isProcessing || engineStatus === 'starting'}
-            engineStatus={engineStatus}
-            onAnalyzeVideo={handleAnalyzeVideo}
-            onFileSelect={handleFileSelect}
-            videoFile={videoFile}
-            videoRef={videoRef}
-            videoUrl={videoUrl}
-          />
-        </section>
+        {/* Video Ingestion Component */}
+        <VideoIngestion
+          videoFile={videoFile}
+          videoUrl={videoUrl}
+          onFileSelect={handleFileSelect}
+          onAnalyzeVideo={handleAnalyzeVideo}
+          isProcessing={isProcessing}
+          hasPlan={hasPlan}
+          videoRef={videoRef}
+          engineStatus={engineStatus}
+        />
 
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <div className="lg:col-span-6 xl:col-span-6 h-full">
-            <ChatPanel
-              hasVideoLoaded={!!videoFile}
-              isProcessing={isProcessing}
-              messages={messages}
-              onSendFeedback={handleSendFeedback}
-            />
+        {/* Bottom Workspace Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left: Chat Panel */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col h-112 justify-between backdrop-blur-sm">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-emerald-400" />
+                <h2 className="text-sm font-semibold text-slate-200">Gemini Video Director Chat</h2>
+              </div>
+              <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono">
+                Agent Active
+              </span>
+            </div>
+
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-500 space-y-2">
+              <Sparkles className="w-8 h-8 text-slate-700" />
+              <p className="text-xs font-medium text-slate-400">No Dialogue Yet</p>
+              <p className="text-[11px] max-w-xs text-slate-500">
+                Upload your source MP4 video above and click <strong className="text-emerald-400 font-normal">Analyze Video</strong> to start working with the Gemini Director Agent.
+              </p>
+            </div>
           </div>
 
-          <div className="lg:col-span-6 xl:col-span-6 h-full">
-            <EditPlanPanel
-              isProcessing={isProcessing}
-              onApproveAndRender={handleApproveAndRender}
-              onSeekToTimecode={handleSeekToTimecode}
-              plan={currentPlan}
-              renderedVideoUrl={renderedVideoUrl}
-            />
-          </div>
-        </section>
-      </main>
+          {/* Right: Edit Plan Review */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col h-112 justify-between backdrop-blur-sm">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
+              <div className="flex items-center gap-2">
+                <ListVideo className="w-4 h-4 text-emerald-400" />
+                <h2 className="text-sm font-semibold text-slate-200">Edit Plan Review</h2>
+              </div>
+              <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-mono">
+                {hasPlan ? 'Plan Ready' : 'Awaiting Video'}
+              </span>
+            </div>
 
-      <footer className="w-full border-t border-slate-800/80 bg-slate-950 py-4 px-6 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="flex items-center gap-1.5 font-medium">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-            AI Video Director Agent • Powered by Next.js, Tailwind CSS & n8n Automation
-          </p>
-          <span className="font-mono text-[11px] text-slate-600">
-            Endpoint: {process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/video-agent'}
-          </span>
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-500 space-y-2">
+              <ListVideo className="w-8 h-8 text-slate-700" />
+              <p className="text-xs font-medium text-slate-400">No Active Edit Plan</p>
+              <p className="text-[11px] max-w-xs text-slate-500">
+                After video upload & analysis, Gemini will generate timeline cut cards, visual B-roll prompts, and popup overlays here.
+              </p>
+            </div>
+          </div>
         </div>
-      </footer>
-    </div>
+      </div>
+    </main>
   );
 }

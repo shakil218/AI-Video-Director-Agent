@@ -6,7 +6,7 @@ import { formatFileSize, formatSecondsToTimecode } from '@/utils/formatTime';
 
 export type EngineStatus = 'idle' | 'starting' | 'ready';
 
-interface VideoIngestionProps {
+export interface VideoIngestionProps {
   videoFile: File | null;
   videoUrl: string | null;
   onFileSelect: (file: File) => void;
@@ -180,7 +180,7 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
                   <div className="flex items-center gap-2">
                     <button
                       onClick={togglePlayPause}
-                      className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-colors shadow-md shadow-emerald-500/20"
+                      className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-colors shadow-md shadow-emerald-500/20 cursor-pointer"
                     >
                       {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
                     </button>
@@ -190,7 +190,7 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
                           videoRef.current.currentTime = 0;
                         }
                       }}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
                       title="Reset to beginning"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -199,7 +199,7 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
 
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="text-xs text-slate-400 hover:text-slate-200 underline font-medium"
+                    className="text-xs text-slate-400 hover:text-slate-200 underline font-medium cursor-pointer"
                   >
                     Change Video
                   </button>
@@ -260,8 +260,8 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
                 isButtonDisabled
                   ? 'bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed'
                   : hasPlan
-                  ? 'bg-emerald-600/20 border border-emerald-500/50 text-emerald-300 hover:bg-emerald-600/30 shadow-emerald-500/10'
-                  : 'bg-linear-to-r from-emerald-500 via-teal-500 to-emerald-400 text-slate-950 hover:brightness-110 shadow-emerald-500/25 active:scale-[0.99]'
+                  ? 'bg-emerald-600/20 border border-emerald-500/50 text-emerald-300 hover:bg-emerald-600/30 shadow-emerald-500/10 cursor-pointer'
+                  : 'bg-linear-to-r from-emerald-500 via-teal-500 to-emerald-400 text-slate-950 hover:brightness-110 shadow-emerald-500/25 active:scale-[0.99] cursor-pointer'
               }`}
             >
               {isEngineStarting ? (
