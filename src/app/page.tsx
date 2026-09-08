@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { VideoIngestion, EngineStatus } from '@/components/header/VideoIngestion';
 import { 
   MessageSquare, ListVideo, Sparkles, RefreshCw, Radio, 
-  CheckCircle2, Send, Clock, Film, Play, Loader2, Edit2, Save, X
+  CheckCircle2, Send, Clock, Play, Loader2, Edit2, Save, X
 } from 'lucide-react';
 
 interface OverlayItem {
@@ -29,7 +29,6 @@ interface ChatMessage {
 export default function Home() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [videoDuration] = useState<string>('01:05');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [hasPlan, setHasPlan] = useState<boolean>(false);
   const [engineStatus, setEngineStatus] = useState<EngineStatus>('idle');
@@ -50,14 +49,6 @@ export default function Home() {
     setSessionId(`session_${Date.now()}`);
   }, []);
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  };
-
   const handleFileSelect = (file: File) => {
     if (videoUrl) {
       URL.revokeObjectURL(videoUrl);
@@ -65,14 +56,13 @@ export default function Home() {
     setVideoFile(file);
     const url = URL.createObjectURL(file);
     setVideoUrl(url);
-    setEngineStatus('ready' as EngineStatus);
+    setEngineStatus('ready');
   };
 
   const handleAnalyzeVideo = async () => {
     if (!videoFile) return;
 
     setIsProcessing(true);
-    setEngineStatus('processing' as EngineStatus);
 
     try {
       const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL;
@@ -109,7 +99,6 @@ export default function Home() {
 
         setOverlays(normalizedOverlays);
         setHasPlan(true);
-        setEngineStatus('completed' as EngineStatus);
 
         const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         setChatMessages([
@@ -128,7 +117,6 @@ export default function Home() {
       }
     } catch (err) {
       console.error('Error analyzing video:', err);
-      setEngineStatus('idle' as EngineStatus);
     } finally {
       setIsProcessing(false);
     }
@@ -227,10 +215,10 @@ export default function Home() {
     setChatMessages([]);
     setRenderedVideoUrl(null);
     setEditingIndex(null);
-    setEngineStatus('idle' as EngineStatus);
+    setEngineStatus('idle');
   };
 
-  // Category counts
+  // Category counts calculation
   const counts = useMemo(() => {
     return {
       all: overlays.length,
@@ -271,10 +259,21 @@ export default function Home() {
     setEditFormData({});
   };
 
+  // Seek Video to Timestamp Handler
+  const handleSeekToTime = (startTime?: number | string) => {
+    if (!videoRef.current || startTime === undefined || startTime === null) return;
+
+    const seconds = typeof startTime === 'string' ? parseFloat(startTime) : startTime;
+    if (!isNaN(seconds)) {
+      videoRef.current.currentTime = seconds;
+      videoRef.current.play().catch((err) => console.error('Auto-play blocked or failed:', err));
+    }
+  };
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8 font-sans">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Top Header */}
+        {/* Header Bar */}
         <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
           <div>
             <div className="flex items-center gap-2.5">
@@ -301,7 +300,7 @@ export default function Home() {
             <button
               type="button"
               onClick={handleNewSession}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 transition-colors cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               New Session
@@ -313,65 +312,21 @@ export default function Home() {
           </div>
         </header>
 
-        {/* Video Ingestion & Source Details */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <VideoIngestion
-              videoFile={videoFile}
-              videoUrl={videoUrl}
-              onFileSelect={handleFileSelect}
-              onAnalyzeVideo={handleAnalyzeVideo}
-              isProcessing={isProcessing}
-              hasPlan={hasPlan}
-              videoRef={videoRef}
-              engineStatus={engineStatus}
-            />
-          </div>
+        {/* Video Ingestion Section */}
+        <VideoIngestion
+          videoFile={videoFile}
+          videoUrl={videoUrl}
+          onFileSelect={handleFileSelect}
+          onAnalyzeVideo={handleAnalyzeVideo}
+          isProcessing={isProcessing}
+          hasPlan={hasPlan}
+          videoRef={videoRef}
+          engineStatus={engineStatus}
+        />
 
-          {/* Source Video Details Card */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm flex flex-col justify-between">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-800/80">
-              <Film className="w-4 h-4 text-emerald-400" />
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">Source Video Details</h2>
-            </div>
-
-            {videoFile ? (
-              <div className="space-y-3 py-4 text-xs font-mono">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">File Name:</span>
-                  <span className="text-slate-200 truncate max-w-45">{videoFile.name}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">File Size:</span>
-                  <span className="text-slate-200">{formatFileSize(videoFile.size)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Duration:</span>
-                  <span className="text-slate-200">{videoDuration}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-4 text-slate-500 text-xs">
-                <Film className="w-8 h-8 text-slate-700 mb-2" />
-                <p>No video loaded</p>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={handleAnalyzeVideo}
-              disabled={!videoFile || isProcessing}
-              className="w-full py-2.5 px-4 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 disabled:opacity-50 transition-colors cursor-pointer"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              Re-Analyze Video Transcript
-            </button>
-          </div>
-        </div>
-
-        {/* Workspace Grid */}
+        {/* Director Workspace */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Panel: Gemini Video Director Chat */}
+          {/* Left Column: Chat Assistant */}
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col h-130 justify-between backdrop-blur-sm">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
               <div className="flex items-center gap-2">
@@ -383,7 +338,7 @@ export default function Home() {
               </span>
             </div>
 
-            {/* Chat Stream Area */}
+            {/* Chat Stream */}
             <div className="flex-1 overflow-y-auto my-3 pr-2 space-y-3">
               {!hasPlan && chatMessages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500 space-y-2">
@@ -420,7 +375,7 @@ export default function Home() {
               )}
             </div>
 
-            {/* Quick Revisions & Input Bar */}
+            {/* Quick Suggestions & Input Form */}
             <div className="space-y-2 pt-2 border-t border-slate-800/80">
               <div className="flex items-center gap-2 overflow-x-auto pb-1 text-[10px]">
                 <span className="text-slate-500 shrink-0 font-medium">Quick Revisions:</span>
@@ -469,7 +424,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right Panel: Interactive Edit Plan Review */}
+          {/* Right Column: Interactive Overlay Cards */}
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col h-130 justify-between backdrop-blur-sm">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
               <div className="flex items-center gap-2">
@@ -481,7 +436,7 @@ export default function Home() {
               </span>
             </div>
 
-            {/* Filter Tabs */}
+            {/* Category Filter Tabs */}
             {hasPlan && (
               <div className="flex items-center gap-1.5 py-2 text-xs font-mono border-b border-slate-800/60">
                 {(['all', 'cuts', 'broll', 'popups'] as const).map((tab) => (
@@ -534,14 +489,14 @@ export default function Home() {
                             <button
                               type="button"
                               onClick={() => saveEditing(index)}
-                              className="p-1 rounded bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-bold"
+                              className="p-1 rounded bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-bold cursor-pointer"
                             >
                               <Save className="w-3.5 h-3.5" />
                             </button>
                             <button
                               type="button"
                               onClick={cancelEditing}
-                              className="p-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700"
+                              className="p-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer"
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
@@ -628,10 +583,17 @@ export default function Home() {
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="font-mono text-[10px] text-emerald-400 bg-emerald-950/50 border border-emerald-800/50 px-2 py-0.5 rounded-md flex items-center gap-1">
+                        {/* Interactive Click-to-Seek Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleSeekToTime(item.start_time)}
+                          className="font-mono text-[10px] text-emerald-400 bg-emerald-950/50 border border-emerald-800/50 px-2 py-0.5 rounded-md flex items-center gap-1 hover:bg-emerald-900/60 hover:border-emerald-500/50 transition-colors cursor-pointer"
+                          title="Click to seek video to timestamp"
+                        >
                           <Clock className="w-3 h-3" />
                           {item.start_time ?? '0'}s - {item.end_time ?? '0'}s
-                        </span>
+                        </button>
+
                         <button
                           type="button"
                           onClick={() => startEditing(index, item)}
@@ -647,7 +609,7 @@ export default function Home() {
               )}
             </div>
 
-            {/* Rendered Video Footer Box */}
+            {/* Rendered Output Link */}
             {renderedVideoUrl && (
               <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs text-emerald-300">
