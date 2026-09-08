@@ -2,14 +2,15 @@
 
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { VideoIngestion, EngineStatus } from '@/components/header/VideoIngestion';
 import { 
   MessageSquare, ListVideo, Sparkles, RefreshCw, Radio, 
-  CheckCircle2, Send, Clock, Film, Play, Loader2
+  CheckCircle2, Send, Clock, Film, Play, Loader2, Edit2, Save, X
 } from 'lucide-react';
 
 interface OverlayItem {
+  id?: string;
   headline?: string;
   subtext?: string;
   position?: string;
@@ -41,6 +42,8 @@ export default function Home() {
   const [revisionInput, setRevisionInput] = useState<string>('');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [overlays, setOverlays] = useState<OverlayItem[]>([]);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editFormData, setEditFormData] = useState<OverlayItem>({});
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -93,14 +96,20 @@ export default function Home() {
         const data = await response.json();
         const root = Array.isArray(data) ? data[0] : data;
 
-        const extractedOverlays: OverlayItem[] = 
+        const rawOverlays: OverlayItem[] = 
           root?.props?.popups || 
           root?.popups || 
           root?.overlays || 
           root?.items || 
           [];
 
-        setOverlays(extractedOverlays);
+        const normalizedOverlays = rawOverlays.map((item, idx) => ({
+          ...item,
+          id: item.id || `overlay-${idx}-${Date.now()}`,
+          type: item.type || 'popup'
+        }));
+
+        setOverlays(normalizedOverlays);
         setHasPlan(true);
         setEngineStatus('completed' as EngineStatus);
 
@@ -110,7 +119,7 @@ export default function Home() {
             id: '1',
             sender: 'bot',
             time: now,
-            text: `Analysis complete! Extracted ${extractedOverlays.length} recommended overlay popups from transcript timing.`,
+            text: `Analysis complete! Extracted ${normalizedOverlays.length} recommended overlay popups from transcript timing.`,
             badge: 'Plan V1'
           }
         ]);
@@ -165,22 +174,27 @@ export default function Home() {
         const data = await response.json();
         const root = Array.isArray(data) ? data[0] : data;
 
-        const extractedOverlays: OverlayItem[] = 
+        const rawOverlays: OverlayItem[] = 
           root?.props?.popups || 
           root?.popups || 
           root?.overlays || 
           root?.items || 
           [];
 
-        if (extractedOverlays.length > 0) {
-          setOverlays(extractedOverlays);
+        if (rawOverlays.length > 0) {
+          const normalizedOverlays = rawOverlays.map((item, idx) => ({
+            ...item,
+            id: item.id || `overlay-${idx}-${Date.now()}`,
+            type: item.type || 'popup'
+          }));
+          setOverlays(normalizedOverlays);
         }
 
         const botMsg: ChatMessage = {
           id: (Date.now() + 1).toString(),
           sender: 'bot',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          text: root?.message || `Revision applied! Updated edit plan with ${extractedOverlays.length} props.`,
+          text: root?.message || `Revision applied! Updated edit plan with ${rawOverlays.length} props.`,
           badge: 'Draft V2'
         };
 
@@ -214,15 +228,50 @@ export default function Home() {
     setOverlays([]);
     setChatMessages([]);
     setRenderedVideoUrl(null);
+    setEditingIndex(null);
     setEngineStatus('idle' as EngineStatus);
   };
 
-  const filteredOverlays = overlays.filter((item: OverlayItem) => {
-    if (activeTab === 'cuts') return item.type === 'cut';
-    if (activeTab === 'broll') return item.type === 'broll';
-    if (activeTab === 'popups') return item.type === 'popup' || (!item.type && item.headline);
-    return true;
-  });
+  // Category counts
+  const counts = useMemo(() => {
+    return {
+      all: overlays.length,
+      cuts: overlays.filter((i) => i.type === 'cut').length,
+      broll: overlays.filter((i) => i.type === 'broll').length,
+      popups: overlays.filter((i) => i.type === 'popup' || !i.type).length,
+    };
+  }, [overlays]);
+
+  // Tab Filtered Items
+  const filteredOverlays = useMemo(() => {
+    return overlays.filter((item: OverlayItem) => {
+      if (activeTab === 'cuts') return item.type === 'cut';
+      if (activeTab === 'broll') return item.type === 'broll';
+      if (activeTab === 'popups') return item.type === 'popup' || !item.type;
+      return true;
+    });
+  }, [overlays, activeTab]);
+
+  // Editing Handlers
+  const startEditing = (index: number, item: OverlayItem) => {
+    setEditingIndex(index);
+    setEditFormData({ ...item });
+  };
+
+  const cancelEditing = () => {
+    setEditingIndex(null);
+    setEditFormData({});
+  };
+
+  const saveEditing = (targetIndex: number) => {
+    setOverlays((prev) => {
+      const next = [...prev];
+      next[targetIndex] = { ...editFormData };
+      return next;
+    });
+    setEditingIndex(null);
+    setEditFormData({});
+  };
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8 font-sans">
@@ -448,7 +497,10 @@ export default function Home() {
                         : 'bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700'
                     }`}
                   >
-                    {tab === 'all' ? `All (${overlays.length})` : `${tab} (${filteredOverlays.length})`}
+                    {tab === 'all' && `All (${counts.all})`}
+                    {tab === 'cuts' && `Cuts (${counts.cuts})`}
+                    {tab === 'broll' && `Broll (${counts.broll})`}
+                    {tab === 'popups' && `Popups (${counts.popups})`}
                   </button>
                 ))}
               </div>
@@ -469,42 +521,131 @@ export default function Home() {
                   No items found for this filter tab.
                 </div>
               ) : (
-                filteredOverlays.map((item: OverlayItem, index: number) => (
-                  <div
-                    key={index}
-                    className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/90 hover:border-emerald-500/30 transition-all flex items-start justify-between gap-3 group"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-xs text-slate-100 uppercase tracking-wide">
-                          {item.headline || 'OVERLAY PROMPT'}
-                        </span>
-                        {item.position && (
-                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                            {item.position}
+                filteredOverlays.map((item: OverlayItem, index: number) => {
+                  const isEditing = editingIndex === index;
+
+                  if (isEditing) {
+                    return (
+                      <div
+                        key={item.id || index}
+                        className="p-3.5 rounded-xl bg-slate-950 border border-emerald-500/50 space-y-2 text-xs"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold text-emerald-400 text-[11px]">Editing Overlay #{index + 1}</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => saveEditing(index)}
+                              className="p-1 rounded bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-bold"
+                            >
+                              <Save className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEditing}
+                              className="p-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            value={editFormData.headline || ''}
+                            onChange={(e) => setEditFormData({ ...editFormData, headline: e.target.value })}
+                            placeholder="Headline"
+                            className="bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white"
+                          />
+                          <input
+                            type="text"
+                            value={editFormData.subtext || ''}
+                            onChange={(e) => setEditFormData({ ...editFormData, subtext: e.target.value })}
+                            placeholder="Subtext"
+                            className="bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-2 text-[10px]">
+                          <input
+                            type="text"
+                            value={editFormData.position || ''}
+                            onChange={(e) => setEditFormData({ ...editFormData, position: e.target.value })}
+                            placeholder="Position (e.g. top-right)"
+                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                          />
+                          <input
+                            type="text"
+                            value={editFormData.theme || ''}
+                            onChange={(e) => setEditFormData({ ...editFormData, theme: e.target.value })}
+                            placeholder="Theme (e.g. bold_clean)"
+                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                          />
+                          <input
+                            type="text"
+                            value={editFormData.start_time ?? ''}
+                            onChange={(e) => setEditFormData({ ...editFormData, start_time: e.target.value })}
+                            placeholder="Start Time (s)"
+                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                          />
+                          <input
+                            type="text"
+                            value={editFormData.end_time ?? ''}
+                            onChange={(e) => setEditFormData({ ...editFormData, end_time: e.target.value })}
+                            placeholder="End Time (s)"
+                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                          />
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={item.id || index}
+                      className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/90 hover:border-emerald-500/30 transition-all flex items-start justify-between gap-3 group"
+                    >
+                      <div className="space-y-1 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-xs text-slate-100 uppercase tracking-wide">
+                            {item.headline || 'OVERLAY PROMPT'}
                           </span>
-                        )}
-                        {item.theme && (
-                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60">
-                            {item.theme}
-                          </span>
+                          {item.position && (
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                              {item.position}
+                            </span>
+                          )}
+                          {item.theme && (
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60">
+                              {item.theme}
+                            </span>
+                          )}
+                        </div>
+                        {item.subtext && (
+                          <p className="text-[11px] text-slate-400 leading-snug">
+                            {item.subtext}
+                          </p>
                         )}
                       </div>
-                      {item.subtext && (
-                        <p className="text-[11px] text-slate-400 leading-snug">
-                          {item.subtext}
-                        </p>
-                      )}
-                    </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="font-mono text-[10px] text-emerald-400 bg-emerald-950/50 border border-emerald-800/50 px-2 py-0.5 rounded-md flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {item.start_time ?? '0'}s - {item.end_time ?? '0'}s
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-mono text-[10px] text-emerald-400 bg-emerald-950/50 border border-emerald-800/50 px-2 py-0.5 rounded-md flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {item.start_time ?? '0'}s - {item.end_time ?? '0'}s
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => startEditing(index, item)}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all cursor-pointer"
+                          title="Edit Card"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
