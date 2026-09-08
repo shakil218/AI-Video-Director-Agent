@@ -20,21 +20,11 @@ export default function Home() {
     setSessionId(`session_${Date.now()}`);
   }, []);
 
-  const handleFileSelect = async (file: File) => {
+  const handleFileSelect = (file: File) => {
     setVideoFile(file);
     setVideoUrl(URL.createObjectURL(file));
-
-    setEngineStatus('starting');
-    try {
-      const serverUrl = process.env.NEXT_PUBLIC_REMOTION_SERVER_URL;
-      if (serverUrl) {
-        await fetch(`${serverUrl}/health`);
-      }
-    } catch (error) {
-      console.warn('Render engine warm-up ping failed:', error);
-    } finally {
-      setEngineStatus('ready');
-    }
+    // Immediately set engine status to ready without waiting on server cold start pings
+    setEngineStatus('ready');
   };
 
   const handleAnalyzeVideo = async () => {
