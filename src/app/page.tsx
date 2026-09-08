@@ -683,22 +683,27 @@ export default function Home() {
               )}
             </div>
 
-            {/* Rendered Output Link */}
+            {/* Rendered Output Video Player */}
             {renderedVideoUrl && (
-              <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs text-emerald-300">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>Final Video Rendered Successfully!</span>
+              <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs text-emerald-300 font-medium">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>Final Video Rendered Successfully!</span>
+                  </div>
+                  <a
+                    href={renderedVideoUrl}
+                    download="rendered_video.mp4"
+                    className="px-3 py-1 rounded-lg bg-emerald-500 text-slate-950 font-bold text-xs flex items-center gap-1 hover:bg-emerald-400 transition-colors"
+                  >
+                    Download
+                  </a>
                 </div>
-                <a
-                  href={renderedVideoUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-3 py-1 rounded-lg bg-emerald-500 text-slate-950 font-bold text-xs flex items-center gap-1 hover:bg-emerald-400 transition-colors"
-                >
-                  <Play className="w-3 h-3 fill-slate-950" />
-                  Watch
-                </a>
+                <video
+                  src={renderedVideoUrl}
+                  controls
+                  className="w-full rounded-lg border border-slate-800 bg-black aspect-video object-contain"
+                />
               </div>
             )}
           </div>
