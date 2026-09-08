@@ -144,16 +144,18 @@ export default function Home() {
       const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL;
       if (!webhookUrl) throw new Error('N8N Webhook URL missing');
 
-      // Send revision prompt to n8n webhook
-      const response = await fetch(webhookUrl, {
+      // Send revision prompt using FormData to match n8n webhook parsing
+      const formData = new FormData();
+      formData.append('action', 'revision');
+      formData.append('sessionId', sessionId);
+      formData.append('prompt', query);
+      formData.append('currentOverlays', JSON.stringify(overlays));
+
+      const url = `${webhookUrl}${webhookUrl.includes('?') ? '&' : '?'}action=revision`;
+
+      const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'revision',
-          sessionId: sessionId,
-          prompt: query,
-          currentOverlays: overlays
-        }),
+        body: formData,
       });
 
       if (response.ok) {
@@ -175,13 +177,13 @@ export default function Home() {
           id: (Date.now() + 1).toString(),
           sender: 'bot',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          text: root?.message || `Revision applied! Regenerated edit plan with ${extractedOverlays.length} props.`,
+          text: root?.message || `Revision applied! Updated edit plan with ${extractedOverlays.length} props.`,
           badge: 'Draft V2'
         };
 
         setChatMessages((prev) => [...prev, botMsg]);
       } else {
-        throw new Error(`n8n webhook error: ${response.statusText}`);
+        throw new Error(`n8n webhook responded with status ${response.status}`);
       }
     } catch (err) {
       console.error('Error executing revision prompt:', err);
@@ -189,7 +191,7 @@ export default function Home() {
         id: (Date.now() + 1).toString(),
         sender: 'bot',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        text: 'Failed to execute revision request. Please ensure n8n workflow accepts JSON prompt payloads.',
+        text: 'Failed to execute revision request. Ensure n8n workflow is active and accepting requests.',
         badge: 'Error'
       };
       setChatMessages((prev) => [...prev, errorMsg]);
