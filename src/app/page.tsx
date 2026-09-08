@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { VideoIngestion, EngineStatus } from '@/components/header/VideoIngestion';
 import { 
   MessageSquare, ListVideo, Sparkles, RefreshCw, Radio, 
-  CheckCircle2, Send, Clock, Play, Loader2, Edit2, Save, X
+  CheckCircle2, Send, Clock, Play, Loader2, Edit2, Save, X, Film
 } from 'lucide-react';
 
 interface OverlayItem {
@@ -30,6 +30,7 @@ export default function Home() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isRendering, setIsRendering] = useState<boolean>(false);
   const [hasPlan, setHasPlan] = useState<boolean>(false);
   const [engineStatus, setEngineStatus] = useState<EngineStatus>('idle');
   const [sessionId, setSessionId] = useState<string>('');
@@ -39,15 +40,20 @@ export default function Home() {
   const [revisionInput, setRevisionInput] = useState<string>('');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [overlays, setOverlays] = useState<OverlayItem[]>([]);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<OverlayItem>({});
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setSessionId(`session_${Date.now()}`);
   }, []);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
   const handleFileSelect = (file: File) => {
     if (videoUrl) {
@@ -203,6 +209,56 @@ export default function Home() {
     }
   };
 
+  const handleRenderVideo = async () => {
+    if (overlays.length === 0 || isRendering) return;
+
+    setIsRendering(true);
+
+    try {
+      const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL;
+      if (!webhookUrl) throw new Error('N8N Webhook URL missing');
+
+      const formData = new FormData();
+      formData.append('action', 'render');
+      formData.append('sessionId', sessionId);
+      formData.append('overlays', JSON.stringify(overlays));
+
+      const url = `${webhookUrl}${webhookUrl.includes('?') ? '&' : '?'}action=render`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const root = Array.isArray(data) ? data[0] : data;
+
+        if (root?.renderedVideoUrl || root?.props?.videoUrl) {
+          setRenderedVideoUrl(root.renderedVideoUrl || root.props.videoUrl);
+        }
+
+        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            sender: 'bot',
+            time: now,
+            text: root?.message || 'Video rendering complete! You can watch or download the rendered output below.',
+            badge: 'Render Complete'
+          }
+        ]);
+      } else {
+        throw new Error(`Render pipeline returned status ${response.status}`);
+      }
+    } catch (err) {
+      console.error('Error triggering video render:', err);
+    } finally {
+      setIsRendering(false);
+    }
+  };
+
   const handleNewSession = () => {
     if (videoUrl) {
       URL.revokeObjectURL(videoUrl);
@@ -214,7 +270,7 @@ export default function Home() {
     setOverlays([]);
     setChatMessages([]);
     setRenderedVideoUrl(null);
-    setEditingIndex(null);
+    setEditingId(null);
     setEngineStatus('idle');
   };
 
@@ -238,24 +294,23 @@ export default function Home() {
     });
   }, [overlays, activeTab]);
 
-  // Editing Handlers
-  const startEditing = (index: number, item: OverlayItem) => {
-    setEditingIndex(index);
+  // Editing Handlers based on unique item ID
+  const startEditing = (item: OverlayItem) => {
+    if (!item.id) return;
+    setEditingId(item.id);
     setEditFormData({ ...item });
   };
 
   const cancelEditing = () => {
-    setEditingIndex(null);
+    setEditingId(null);
     setEditFormData({});
   };
 
-  const saveEditing = (targetIndex: number) => {
-    setOverlays((prev) => {
-      const next = [...prev];
-      next[targetIndex] = { ...editFormData };
-      return next;
-    });
-    setEditingIndex(null);
+  const saveEditing = (targetId: string) => {
+    setOverlays((prev) =>
+      prev.map((item) => (item.id === targetId ? { ...editFormData } : item))
+    );
+    setEditingId(null);
     setEditFormData({});
   };
 
@@ -373,6 +428,7 @@ export default function Home() {
                   </div>
                 ))
               )}
+              <div ref={chatEndRef} />
             </div>
 
             {/* Quick Suggestions & Input Form */}
@@ -431,9 +487,26 @@ export default function Home() {
                 <ListVideo className="w-4 h-4 text-emerald-400" />
                 <h2 className="text-sm font-semibold text-slate-200">Edit Plan Review</h2>
               </div>
-              <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-mono">
-                {hasPlan ? `Approved (${overlays.length} Props)` : 'Awaiting Ingestion'}
-              </span>
+              <div className="flex items-center gap-2">
+                {hasPlan && (
+                  <button
+                    type="button"
+                    onClick={handleRenderVideo}
+                    disabled={isRendering || isProcessing}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-[11px] flex items-center gap-1 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    {isRendering ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Film className="w-3 h-3" />
+                    )}
+                    Render Output
+                  </button>
+                )}
+                <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-mono">
+                  {hasPlan ? `Approved (${overlays.length} Props)` : 'Awaiting Ingestion'}
+                </span>
+              </div>
             </div>
 
             {/* Category Filter Tabs */}
@@ -475,20 +548,21 @@ export default function Home() {
                 </div>
               ) : (
                 filteredOverlays.map((item: OverlayItem, index: number) => {
-                  const isEditing = editingIndex === index;
+                  const itemKey = item.id || `overlay-${index}`;
+                  const isEditing = editingId === itemKey;
 
                   if (isEditing) {
                     return (
                       <div
-                        key={item.id || index}
+                        key={itemKey}
                         className="p-3.5 rounded-xl bg-slate-950 border border-emerald-500/50 space-y-2 text-xs"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-bold text-emerald-400 text-[11px]">Editing Overlay #{index + 1}</span>
+                          <span className="font-bold text-emerald-400 text-[11px]">Editing Overlay</span>
                           <div className="flex items-center gap-1">
                             <button
                               type="button"
-                              onClick={() => saveEditing(index)}
+                              onClick={() => saveEditing(itemKey)}
                               className="p-1 rounded bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-bold cursor-pointer"
                             >
                               <Save className="w-3.5 h-3.5" />
@@ -556,7 +630,7 @@ export default function Home() {
 
                   return (
                     <div
-                      key={item.id || index}
+                      key={itemKey}
                       className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/90 hover:border-emerald-500/30 transition-all flex items-start justify-between gap-3 group"
                     >
                       <div className="space-y-1 flex-1">
@@ -596,7 +670,7 @@ export default function Home() {
 
                         <button
                           type="button"
-                          onClick={() => startEditing(index, item)}
+                          onClick={() => startEditing(item)}
                           className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all cursor-pointer"
                           title="Edit Card"
                         >
