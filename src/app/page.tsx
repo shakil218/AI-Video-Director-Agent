@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Player } from '@remotion/player';
+import Composition, { PopupData } from '@/remotion/Composition';
 import { VideoIngestion, EngineStatus } from '@/components/header/VideoIngestion';
 import { 
   MessageSquare, ListVideo, Sparkles, RefreshCw, Radio, 
@@ -863,9 +865,39 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Live Canvas Preview */}
+        {hasPlan && videoUrl && (
+          <div className="bg-slate-900/80 border border-emerald-500/40 rounded-2xl p-5 space-y-3 backdrop-blur-sm mt-6">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                <h2 className="text-sm font-semibold text-slate-200">Live Rendered Preview</h2>
+              </div>
+              <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20">
+                Real-Time Remotion Canvas
+              </span>
+            </div>
+            <div className="aspect-video bg-black rounded-xl overflow-hidden border border-slate-800">
+              <Player
+                component={Composition}
+                inputProps={{
+                  videoUrl: videoUrl,
+                  popups: overlays as unknown as PopupData[],
+                }}
+                durationInFrames={1800}
+                fps={30}
+                compositionWidth={1920}
+                compositionHeight={1080}
+                style={{ width: '100%', height: '100%' }}
+                controls
+              />
+            </div>
+          </div>
+        )}
+
         {/* Rendered Output Preview Card */}
         {renderedVideoUrl && (
-          <div className="bg-slate-900/80 border border-emerald-500/40 rounded-2xl p-5 space-y-3 backdrop-blur-sm">
+          <div className="bg-slate-900/80 border border-emerald-500/40 rounded-2xl p-5 space-y-3 backdrop-blur-sm mt-6">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-400" />
