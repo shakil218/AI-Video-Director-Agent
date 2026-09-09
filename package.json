@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@remotion/cli": "^4.0.522",
     "@remotion/player": "^4.0.522",
     "@remotion/web-renderer": "^4.0.522",
     "lucide-react": "^1.31.0",

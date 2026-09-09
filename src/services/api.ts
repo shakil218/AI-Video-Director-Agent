@@ -17,6 +17,30 @@ export interface APIResponse extends BaseAPIResponse {
 const N8N_WEBHOOK_URL = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/d74024e6-ba1f-4b16-9ae5-40dd6c32dbca';
 
 /**
+ * Utility to strip local proxy wrappers (e.g. /api/proxy-video?url=...) 
+ * to send direct public HTTP/S3 URLs to Remotion render engine.
+ */
+function unwrapProxyUrl(rawUrl?: string | null): string {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  let url = rawUrl.trim();
+  let prev = '';
+  
+  while (url !== prev) {
+    prev = url;
+    try {
+      url = decodeURIComponent(url);
+    } catch {
+      // Continue if string is already decoded
+    }
+    const match = url.match(/(?:proxy-video\?url=|proxy\?src=)(https?:\/\/[^\s&]+)/i);
+    if (match && match[1]) {
+      url = match[1].trim();
+    }
+  }
+  return url;
+}
+
+/**
  * Fallback parser to extract JSON objects from plain text or Markdown blocks (```json ... ```)
  * Includes regex parsing for plain text lines (Headline: "..." | Subtext: "..." | Position: ...).
  */
@@ -67,8 +91,6 @@ export function parsePlanFromText(responseText: string): any | null {
 
 /**
  * Normalizes raw payload from n8n into a strict EditPlan object.
- * Fixes key mismatches, un-wraps embedded JSON text from Gemini, 
- * and retains existing items from fallbackPlan if n8n returns a status-only response.
  */
 function normalizePlanPayload(data: any, fallbackPlan: EditPlan | null = null): EditPlan {
   let sourceData = data || {};
@@ -215,7 +237,8 @@ export async function uploadVideo(
     }
 
     const normalizedPlan = normalizePlanPayload(data);
-    const uploadedVideoUrl = data.videoUrl || data.url || data.publicUrl || data.fileUrl || undefined;
+    const rawUrl = data.videoUrl || data.mediaUrl || data.url || data.publicUrl || data.fileUrl || undefined;
+    const uploadedVideoUrl = unwrapProxyUrl(rawUrl);
 
     return {
       success: true,
@@ -302,13 +325,15 @@ export async function approvePlan(
   sourceVideoUrl?: string | null,
   wantedProps: WantedProp[] = []
 ): Promise<APIResponse> {
+  const cleanVideoUrl = unwrapProxyUrl(sourceVideoUrl);
+
   if (isMock) {
     await new Promise((resolve) => setTimeout(resolve, 2000));
     return {
       success: true,
       message: '[Mock Mode] Simulated render complete.',
       plan: { ...plan, version: 'Approved' },
-      renderedVideoUrl: sourceVideoUrl || '',
+      renderedVideoUrl: cleanVideoUrl || '',
     };
   }
 
@@ -318,7 +343,8 @@ export async function approvePlan(
       sessionId,
       plan,
       wantedProps,
-      videoUrl: sourceVideoUrl,
+      overlays: plan?.popups || [],
+      videoUrl: cleanVideoUrl,
     };
 
     const response = await fetch(N8N_WEBHOOK_URL, {
@@ -344,12 +370,13 @@ export async function approvePlan(
     }
 
     const approvedPlan = normalizePlanPayload(data, { ...plan, version: 'Approved' });
+    const renderedUrl = unwrapProxyUrl(data.renderedVideoUrl || data.mediaUrl || data.url || data.videoUrl);
 
     return {
       success: true,
       message: data.message || 'Render initiated successfully!',
       plan: approvedPlan,
-      renderedVideoUrl: data.renderedVideoUrl || data.url || data.videoUrl || '',
+      renderedVideoUrl: renderedUrl || '',
     };
   } catch (error: any) {
     console.error('n8n approve webhook error:', error);
