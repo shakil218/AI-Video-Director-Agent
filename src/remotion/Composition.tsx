@@ -167,14 +167,9 @@ export const MainReel: React.FC<MainReelProps> = ({ videoUrl, popups }) => {
 
   let cleanUrl = String(videoUrl || "").trim();
 
-  if (
-    cleanUrl.startsWith("http") &&
-    !cleanUrl.includes("localhost") &&
-    !cleanUrl.includes("proxy-video")
-  ) {
-    cleanUrl = `/api/proxy-video?url=${encodeURIComponent(cleanUrl)}`;
-  } else if (!cleanUrl) {
-    cleanUrl = "https://remotion-assets.s3.eu-central-1.amazonaws.com/BigBuckBunny.mp4";
+  // Prevents invalid proxy routes or broken AWS links from throwing MEDIA_ELEMENT_ERROR in Remotion Studio
+  if (!cleanUrl || cleanUrl === "undefined" || cleanUrl === "null" || cleanUrl.includes("remotion-assets.s3")) {
+    cleanUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
   }
 
   return (
@@ -182,6 +177,7 @@ export const MainReel: React.FC<MainReelProps> = ({ videoUrl, popups }) => {
       {cleanUrl ? (
         <OffthreadVideo
           src={cleanUrl}
+          onError={(err) => console.warn("Video stream load warning:", err)}
           style={{
             width: "100%",
             height: "100%",
