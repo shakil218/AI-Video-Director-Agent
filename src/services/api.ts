@@ -11,6 +11,7 @@ import {
 // Extend base APIResponse to guarantee videoUrl and renderedVideoUrl exist on returned types
 export interface APIResponse extends BaseAPIResponse {
   videoUrl?: string;
+  mediaUrl?: string;
   renderedVideoUrl?: string;
 }
 
@@ -196,7 +197,8 @@ export async function uploadVideo(
       message: `[Mock Mode] Ingested "${file.name}".`,
       plan: MOCK_INITIAL_PLAN,
       transcript: 'This is a sample mock transcript for testing visual layout.',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+      videoUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+      mediaUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
     };
   }
 
@@ -237,8 +239,25 @@ export async function uploadVideo(
     }
 
     const normalizedPlan = normalizePlanPayload(data);
-    const rawUrl = data.videoUrl || data.mediaUrl || data.url || data.publicUrl || data.fileUrl || undefined;
+    const rawUrl =
+      data.mediaUrl ||
+      data.videoUrl ||
+      data.url ||
+      data.publicUrl ||
+      data.fileUrl ||
+      data.props?.mediaUrl ||
+      data.props?.videoUrl ||
+      undefined;
+
     const uploadedVideoUrl = unwrapProxyUrl(rawUrl);
+    const isPermanentUrl = /^https?:\/\//i.test(uploadedVideoUrl);
+
+    if (!isPermanentUrl) {
+      throw new Error(
+        'n8n upload did not return a permanent public HTTP/HTTPS mediaUrl. ' +
+        'The browser blob URL cannot be used by Remotion.'
+      );
+    }
 
     return {
       success: true,
@@ -246,6 +265,7 @@ export async function uploadVideo(
       plan: normalizedPlan,
       transcript: data.transcript || normalizedPlan.transcript || '',
       videoUrl: uploadedVideoUrl,
+      mediaUrl: uploadedVideoUrl,
     };
   } catch (error: any) {
     console.error('n8n upload webhook error:', error);
@@ -326,6 +346,16 @@ export async function approvePlan(
   wantedProps: WantedProp[] = []
 ): Promise<APIResponse> {
   const cleanVideoUrl = unwrapProxyUrl(sourceVideoUrl);
+  const isPermanentSourceUrl = /^https?:\/\//i.test(cleanVideoUrl);
+
+  if (!isMock && !isPermanentSourceUrl) {
+    return {
+      success: false,
+      message:
+        'Render requires the permanent public HTTP/HTTPS mediaUrl returned by n8n upload. ' +
+        'A browser blob: URL cannot be rendered by the server.',
+    };
+  }
 
   if (isMock) {
     await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -345,6 +375,7 @@ export async function approvePlan(
       wantedProps,
       overlays: plan?.popups || [],
       videoUrl: cleanVideoUrl,
+      mediaUrl: cleanVideoUrl,
     };
 
     const response = await fetch(N8N_WEBHOOK_URL, {
@@ -370,12 +401,15 @@ export async function approvePlan(
     }
 
     const approvedPlan = normalizePlanPayload(data, { ...plan, version: 'Approved' });
-    const renderedUrl = unwrapProxyUrl(data.renderedVideoUrl || data.mediaUrl || data.url || data.videoUrl);
+    const renderedUrl = unwrapProxyUrl(
+      data.renderedVideoUrl || data.mediaUrl || data.url || data.videoUrl
+    );
 
     return {
       success: true,
-      message: data.message || 'Render initiated successfully!',
+      message: data.message || 'Render completed successfully!',
       plan: approvedPlan,
+      mediaUrl: renderedUrl || '',
       renderedVideoUrl: renderedUrl || '',
     };
   } catch (error: any) {

@@ -31,7 +31,13 @@ interface ChatMessage {
 
 export default function Home() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  // videoUrl is the URL used by the preview/player. After upload it becomes
+  // the permanent public R2/S3 URL returned by n8n.
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  // previewUrl is only a browser-local blob URL. It must NEVER be sent to n8n/Remotion.
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // mediaUrl is the permanent server-renderable URL returned by the upload workflow.
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isRendering, setIsRendering] = useState<boolean>(false);
   const [hasPlan, setHasPlan] = useState<boolean>(false);
@@ -88,12 +94,18 @@ export default function Home() {
   }, [videoUrl]);
 
   const handleFileSelect = (file: File) => {
-    if (videoUrl) {
-      URL.revokeObjectURL(videoUrl);
+    // Only revoke the browser-created preview URL.
+    if (previewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
     }
+
+    const localPreviewUrl = URL.createObjectURL(file);
+
     setVideoFile(file);
-    const url = URL.createObjectURL(file);
-    setVideoUrl(url);
+    setPreviewUrl(localPreviewUrl);
+    setMediaUrl(null);
+    setVideoUrl(localPreviewUrl);
+    setRenderedVideoUrl(null);
     setEngineStatus('ready');
   };
 
@@ -149,10 +161,28 @@ export default function Home() {
           }
         ]);
 
-        // Update videoUrl to the public/S3 hosted URL returned by n8n if available
-        const incomingVideoUrl = root?.videoUrl || root?.mediaUrl || root?.url || root?.publicUrl || root?.props?.videoUrl;
-        if (incomingVideoUrl) {
-          setVideoUrl(incomingVideoUrl);
+        // IMPORTANT:
+        // A browser blob: URL only exists inside the browser and cannot be rendered
+        // by the n8n/Remotion server. Store the permanent public R2/S3 URL separately.
+        const incomingVideoUrl =
+          root?.mediaUrl ||
+          root?.videoUrl ||
+          root?.url ||
+          root?.publicUrl ||
+          root?.fileUrl ||
+          root?.props?.mediaUrl ||
+          root?.props?.videoUrl ||
+          '';
+
+        if (typeof incomingVideoUrl === 'string' && /^https?:\/\//i.test(incomingVideoUrl.trim())) {
+          const permanentUrl = incomingVideoUrl.trim();
+          setMediaUrl(permanentUrl);
+          setVideoUrl(permanentUrl);
+        } else {
+          console.warn(
+            'n8n upload completed but did not return a permanent HTTP/HTTPS mediaUrl. ' +
+            'The browser preview will remain local and must not be used for rendering.'
+          );
         }
 
         const incomingRenderedUrl = root?.renderedVideoUrl;
@@ -192,8 +222,10 @@ export default function Home() {
       formData.append('action', 'revision');
       formData.append('sessionId', sessionId);
       formData.append('prompt', query);
-      if (videoUrl) {
-        formData.append('videoUrl', videoUrl);
+      const revisionVideoUrl = mediaUrl || (videoUrl?.startsWith('http') ? videoUrl : '');
+      if (revisionVideoUrl) {
+        formData.append('videoUrl', revisionVideoUrl);
+        formData.append('mediaUrl', revisionVideoUrl);
       }
       formData.append('currentOverlays', JSON.stringify(overlays));
 
@@ -254,6 +286,28 @@ export default function Home() {
   const handleRenderVideo = async () => {
     if (overlays.length === 0 || isRendering) return;
 
+    // Render MUST use the permanent uploaded media URL.
+    // Never send a browser blob: URL to n8n/Remotion.
+    const renderVideoUrl = mediaUrl || (videoUrl?.startsWith('http') ? videoUrl : null);
+
+    if (!renderVideoUrl || !/^https?:\/\//i.test(renderVideoUrl)) {
+      const message =
+        'The uploaded video does not have a permanent public media URL yet. ' +
+        'Please click Analyze Video first so n8n uploads the MP4 to R2/S3, then render again.';
+      console.error(message);
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          sender: 'bot',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          text: message,
+          badge: 'Render Error'
+        }
+      ]);
+      return;
+    }
+
     setIsRendering(true);
 
     try {
@@ -263,10 +317,8 @@ export default function Home() {
       const formData = new FormData();
       formData.append('action', 'render');
       formData.append('sessionId', sessionId);
-      if (videoUrl) {
-        formData.append('videoUrl', videoUrl);
-        formData.append('mediaUrl', videoUrl);
-      }
+      formData.append('videoUrl', renderVideoUrl);
+      formData.append('mediaUrl', renderVideoUrl);
       formData.append('overlays', JSON.stringify(overlays));
 
       const url = `${webhookUrl}${webhookUrl.includes('?') ? '&' : '?'}action=render`;
@@ -307,11 +359,13 @@ export default function Home() {
   };
 
   const handleNewSession = () => {
-    if (videoUrl) {
-      URL.revokeObjectURL(videoUrl);
+    if (previewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
     }
     setSessionId(`session_${Date.now()}`);
     setVideoFile(null);
+    setPreviewUrl(null);
+    setMediaUrl(null);
     setVideoUrl(null);
     setHasPlan(false);
     setOverlays([]);
