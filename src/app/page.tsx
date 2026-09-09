@@ -4,7 +4,8 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { VideoIngestion, EngineStatus } from '@/components/header/VideoIngestion';
 import { 
   MessageSquare, ListVideo, Sparkles, RefreshCw, Radio, 
-  CheckCircle2, Send, Clock, Play, Loader2, Edit2, Save, X, Film
+  CheckCircle2, Send, Clock, Loader2, Edit2, Save, X, Film, Download,
+  Plus, Trash2, Copy, Check
 } from 'lucide-react';
 
 interface OverlayItem {
@@ -44,6 +45,20 @@ export default function Home() {
   const [editFormData, setEditFormData] = useState<OverlayItem>({});
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
 
+  // Active Time Tracking & Manual Overlay Creation States
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [isAddingNew, setIsAddingNew] = useState<boolean>(false);
+  const [newFormData, setNewFormData] = useState<OverlayItem>({
+    headline: '',
+    subtext: '',
+    position: 'bottom-center',
+    theme: 'bold_clean',
+    start_time: 0,
+    end_time: 5,
+    type: 'popup'
+  });
+  const [copied, setCopied] = useState<boolean>(false);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -54,6 +69,21 @@ export default function Home() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
+
+  // Video Time Update Listener for Sync & Highlight
+  useEffect(() => {
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(videoEl.currentTime);
+    };
+
+    videoEl.addEventListener('timeupdate', handleTimeUpdate);
+    return () => {
+      videoEl.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [videoUrl]);
 
   const handleFileSelect = (file: File) => {
     if (videoUrl) {
@@ -117,8 +147,9 @@ export default function Home() {
           }
         ]);
 
-        if (root?.renderedVideoUrl || root?.props?.videoUrl) {
-          setRenderedVideoUrl(root.renderedVideoUrl || root.props.videoUrl);
+        const incomingUrl = root?.renderedVideoUrl || root?.props?.videoUrl || root?.videoUrl;
+        if (incomingUrl) {
+          setRenderedVideoUrl(incomingUrl);
         }
       }
     } catch (err) {
@@ -234,8 +265,9 @@ export default function Home() {
         const data = await response.json();
         const root = Array.isArray(data) ? data[0] : data;
 
-        if (root?.renderedVideoUrl || root?.props?.videoUrl) {
-          setRenderedVideoUrl(root.renderedVideoUrl || root.props.videoUrl);
+        const incomingUrl = root?.renderedVideoUrl || root?.props?.videoUrl || root?.videoUrl;
+        if (incomingUrl) {
+          setRenderedVideoUrl(incomingUrl);
         }
 
         const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -245,7 +277,7 @@ export default function Home() {
             id: Date.now().toString(),
             sender: 'bot',
             time: now,
-            text: root?.message || 'Video rendering complete! You can watch or download the rendered output below.',
+            text: root?.message || 'Video rendering complete! You can watch or download the rendered output directly below.',
             badge: 'Render Complete'
           }
         ]);
@@ -272,9 +304,9 @@ export default function Home() {
     setRenderedVideoUrl(null);
     setEditingId(null);
     setEngineStatus('idle');
+    setIsAddingNew(false);
   };
 
-  // Category counts calculation
   const counts = useMemo(() => {
     return {
       all: overlays.length,
@@ -284,7 +316,6 @@ export default function Home() {
     };
   }, [overlays]);
 
-  // Tab Filtered Items
   const filteredOverlays = useMemo(() => {
     return overlays.filter((item: OverlayItem) => {
       if (activeTab === 'cuts') return item.type === 'cut';
@@ -294,7 +325,6 @@ export default function Home() {
     });
   }, [overlays, activeTab]);
 
-  // Editing Handlers based on unique item ID
   const startEditing = (item: OverlayItem) => {
     if (!item.id) return;
     setEditingId(item.id);
@@ -314,7 +344,36 @@ export default function Home() {
     setEditFormData({});
   };
 
-  // Seek Video to Timestamp Handler
+  const handleDeleteOverlay = (targetId: string) => {
+    setOverlays((prev) => prev.filter((item) => item.id !== targetId));
+  };
+
+  const handleAddNewOverlay = () => {
+    const newItem: OverlayItem = {
+      ...newFormData,
+      id: `overlay-manual-${Date.now()}`,
+      type: newFormData.type || 'popup',
+    };
+    setOverlays((prev) => [...prev, newItem]);
+    setIsAddingNew(false);
+    setNewFormData({
+      headline: '',
+      subtext: '',
+      position: 'bottom-center',
+      theme: 'bold_clean',
+      start_time: Math.floor(currentTime),
+      end_time: Math.floor(currentTime) + 5,
+      type: 'popup'
+    });
+    if (!hasPlan) setHasPlan(true);
+  };
+
+  const handleCopyJson = () => {
+    navigator.clipboard.writeText(JSON.stringify(overlays, null, 2));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleSeekToTime = (startTime?: number | string) => {
     if (!videoRef.current || startTime === undefined || startTime === null) return;
 
@@ -323,6 +382,14 @@ export default function Home() {
       videoRef.current.currentTime = seconds;
       videoRef.current.play().catch((err) => console.error('Auto-play blocked or failed:', err));
     }
+  };
+
+  const isItemActive = (item: OverlayItem) => {
+    if (item.start_time === undefined || item.end_time === undefined) return false;
+    const start = typeof item.start_time === 'string' ? parseFloat(item.start_time) : item.start_time;
+    const end = typeof item.end_time === 'string' ? parseFloat(item.end_time) : item.end_time;
+    if (isNaN(start) || isNaN(end)) return false;
+    return currentTime >= start && currentTime <= end;
   };
 
   return (
@@ -348,6 +415,17 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-3">
+            {overlays.length > 0 && (
+              <button
+                type="button"
+                onClick={handleCopyJson}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 transition-colors cursor-pointer"
+                title="Copy Edit Plan JSON"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? 'Copied' : 'Export JSON'}
+              </button>
+            )}
             <span className="font-mono text-xs text-emerald-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               {sessionId || 'Initializing...'}
@@ -488,6 +566,15 @@ export default function Home() {
                 <h2 className="text-sm font-semibold text-slate-200">Edit Plan Review</h2>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingNew(!isAddingNew)}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3 h-3 text-emerald-400" />
+                  Add Card
+                </button>
+
                 {hasPlan && (
                   <button
                     type="button"
@@ -511,24 +598,98 @@ export default function Home() {
 
             {/* Category Filter Tabs */}
             {hasPlan && (
-              <div className="flex items-center gap-1.5 py-2 text-xs font-mono border-b border-slate-800/60">
-                {(['all', 'cuts', 'broll', 'popups'] as const).map((tab) => (
-                  <button
-                    type="button"
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-3 py-1 rounded-lg border transition-all text-[11px] capitalize cursor-pointer ${
-                      activeTab === tab
-                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-bold'
-                        : 'bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    {tab === 'all' && `All (${counts.all})`}
-                    {tab === 'cuts' && `Cuts (${counts.cuts})`}
-                    {tab === 'broll' && `Broll (${counts.broll})`}
-                    {tab === 'popups' && `Popups (${counts.popups})`}
+              <div className="flex items-center justify-between py-2 text-xs font-mono border-b border-slate-800/60">
+                <div className="flex items-center gap-1.5">
+                  {(['all', 'cuts', 'broll', 'popups'] as const).map((tab) => (
+                    <button
+                      type="button"
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`px-3 py-1 rounded-lg border transition-all text-[11px] capitalize cursor-pointer ${
+                        activeTab === tab
+                          ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-bold'
+                          : 'bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      {tab === 'all' && `All (${counts.all})`}
+                      {tab === 'cuts' && `Cuts (${counts.cuts})`}
+                      {tab === 'broll' && `Broll (${counts.broll})`}
+                      {tab === 'popups' && `Popups (${counts.popups})`}
+                    </button>
+                  ))}
+                </div>
+                {currentTime > 0 && (
+                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40">
+                    Playback: {currentTime.toFixed(1)}s
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Add New Card Inline Form */}
+            {isAddingNew && (
+              <div className="p-3 rounded-xl bg-slate-950 border border-emerald-500/40 space-y-2 text-xs my-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-400 text-[11px]">Create New Overlay Card</span>
+                  <button type="button" onClick={() => setIsAddingNew(false)} className="text-slate-400 hover:text-white">
+                    <X className="w-3.5 h-3.5" />
                   </button>
-                ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={newFormData.headline || ''}
+                    onChange={(e) => setNewFormData({ ...newFormData, headline: e.target.value })}
+                    placeholder="Headline"
+                    className="bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white"
+                  />
+                  <input
+                    type="text"
+                    value={newFormData.subtext || ''}
+                    onChange={(e) => setNewFormData({ ...newFormData, subtext: e.target.value })}
+                    placeholder="Subtext"
+                    className="bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white"
+                  />
+                </div>
+                <div className="grid grid-cols-4 gap-2 text-[10px]">
+                  <select
+                    value={newFormData.type || 'popup'}
+                    onChange={(e) => setNewFormData({ ...newFormData, type: e.target.value as any })}
+                    className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                  >
+                    <option value="popup">Popup</option>
+                    <option value="broll">Broll</option>
+                    <option value="cut">Cut</option>
+                  </select>
+                  <input
+                    type="text"
+                    value={newFormData.position || ''}
+                    onChange={(e) => setNewFormData({ ...newFormData, position: e.target.value })}
+                    placeholder="Position"
+                    className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                  />
+                  <input
+                    type="text"
+                    value={newFormData.start_time ?? ''}
+                    onChange={(e) => setNewFormData({ ...newFormData, start_time: e.target.value })}
+                    placeholder="Start (s)"
+                    className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                  />
+                  <input
+                    type="text"
+                    value={newFormData.end_time ?? ''}
+                    onChange={(e) => setNewFormData({ ...newFormData, end_time: e.target.value })}
+                    placeholder="End (s)"
+                    className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddNewOverlay}
+                  className="w-full py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs cursor-pointer"
+                >
+                  Save Card
+                </button>
               </div>
             )}
 
@@ -550,6 +711,7 @@ export default function Home() {
                 filteredOverlays.map((item: OverlayItem, index: number) => {
                   const itemKey = item.id || `overlay-${index}`;
                   const isEditing = editingId === itemKey;
+                  const active = isItemActive(item);
 
                   if (isEditing) {
                     return (
@@ -595,32 +757,34 @@ export default function Home() {
                         </div>
 
                         <div className="grid grid-cols-4 gap-2 text-[10px]">
+                          <select
+                            value={editFormData.type || 'popup'}
+                            onChange={(e) => setEditFormData({ ...editFormData, type: e.target.value as any })}
+                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                          >
+                            <option value="popup">Popup</option>
+                            <option value="broll">Broll</option>
+                            <option value="cut">Cut</option>
+                          </select>
                           <input
                             type="text"
                             value={editFormData.position || ''}
                             onChange={(e) => setEditFormData({ ...editFormData, position: e.target.value })}
-                            placeholder="Position (e.g. top-right)"
-                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                          />
-                          <input
-                            type="text"
-                            value={editFormData.theme || ''}
-                            onChange={(e) => setEditFormData({ ...editFormData, theme: e.target.value })}
-                            placeholder="Theme (e.g. bold_clean)"
+                            placeholder="Position"
                             className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
                           />
                           <input
                             type="text"
                             value={editFormData.start_time ?? ''}
                             onChange={(e) => setEditFormData({ ...editFormData, start_time: e.target.value })}
-                            placeholder="Start Time (s)"
+                            placeholder="Start (s)"
                             className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
                           />
                           <input
                             type="text"
                             value={editFormData.end_time ?? ''}
                             onChange={(e) => setEditFormData({ ...editFormData, end_time: e.target.value })}
-                            placeholder="End Time (s)"
+                            placeholder="End (s)"
                             className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
                           />
                         </div>
@@ -631,83 +795,102 @@ export default function Home() {
                   return (
                     <div
                       key={itemKey}
-                      className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/90 hover:border-emerald-500/30 transition-all flex items-start justify-between gap-3 group"
+                      className={`p-3.5 rounded-xl border transition-all duration-200 ${
+                        active
+                          ? 'bg-emerald-950/40 border-emerald-500/80 shadow-lg shadow-emerald-950/50 scale-[1.01]'
+                          : 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
+                      }`}
                     >
-                      <div className="space-y-1 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-xs text-slate-100 uppercase tracking-wide">
-                            {item.headline || 'OVERLAY PROMPT'}
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-[9px] font-mono font-semibold px-2 py-0.5 rounded uppercase ${
+                              item.type === 'cut'
+                                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                                : item.type === 'broll'
+                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                            }`}
+                          >
+                            {item.type || 'popup'}
                           </span>
-                          {item.position && (
-                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                              {item.position}
-                            </span>
-                          )}
-                          {item.theme && (
-                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60">
-                              {item.theme}
-                            </span>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleSeekToTime(item.start_time)}
+                            className="flex items-center gap-1 font-mono text-[10px] text-slate-400 hover:text-emerald-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 cursor-pointer transition-colors"
+                          >
+                            <Clock className="w-2.5 h-2.5 text-slate-500" />
+                            {item.start_time ?? 0}s - {item.end_time ?? 0}s
+                          </button>
                         </div>
-                        {item.subtext && (
-                          <p className="text-[11px] text-slate-400 leading-snug">
-                            {item.subtext}
-                          </p>
-                        )}
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => startEditing(item)}
+                            className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors cursor-pointer"
+                            title="Edit Overlay"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOverlay(itemKey)}
+                            className="p-1 text-slate-400 hover:text-rose-400 rounded hover:bg-slate-800 transition-colors cursor-pointer"
+                            title="Delete Overlay"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        {/* Interactive Click-to-Seek Button */}
-                        <button
-                          type="button"
-                          onClick={() => handleSeekToTime(item.start_time)}
-                          className="font-mono text-[10px] text-emerald-400 bg-emerald-950/50 border border-emerald-800/50 px-2 py-0.5 rounded-md flex items-center gap-1 hover:bg-emerald-900/60 hover:border-emerald-500/50 transition-colors cursor-pointer"
-                          title="Click to seek video to timestamp"
-                        >
-                          <Clock className="w-3 h-3" />
-                          {item.start_time ?? '0'}s - {item.end_time ?? '0'}s
-                        </button>
+                      {item.headline && (
+                        <h3 className="text-xs font-semibold text-slate-100">{item.headline}</h3>
+                      )}
+                      {item.subtext && (
+                        <p className="text-[11px] text-slate-400 mt-0.5 leading-normal">{item.subtext}</p>
+                      )}
 
-                        <button
-                          type="button"
-                          onClick={() => startEditing(item)}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all cursor-pointer"
-                          title="Edit Card"
-                        >
-                          <Edit2 className="w-3 h-3" />
-                        </button>
+                      <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] font-mono text-slate-500">
+                        <span>Pos: {item.position || 'bottom-center'}</span>
+                        <span>Theme: {item.theme || 'bold_clean'}</span>
                       </div>
                     </div>
                   );
                 })
               )}
             </div>
-
-            {/* Rendered Output Video Player */}
-            {renderedVideoUrl && (
-              <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs text-emerald-300 font-medium">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>Final Video Rendered Successfully!</span>
-                  </div>
-                  <a
-                    href={renderedVideoUrl}
-                    download="rendered_video.mp4"
-                    className="px-3 py-1 rounded-lg bg-emerald-500 text-slate-950 font-bold text-xs flex items-center gap-1 hover:bg-emerald-400 transition-colors"
-                  >
-                    Download
-                  </a>
-                </div>
-                <video
-                  src={renderedVideoUrl}
-                  controls
-                  className="w-full rounded-lg border border-slate-800 bg-black aspect-video object-contain"
-                />
-              </div>
-            )}
           </div>
         </div>
+
+        {/* Rendered Output Preview Card */}
+        {renderedVideoUrl && (
+          <div className="bg-slate-900/80 border border-emerald-500/40 rounded-2xl p-5 space-y-3 backdrop-blur-sm">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                <h2 className="text-sm font-semibold text-slate-200">Final Rendered Output</h2>
+              </div>
+              <a
+                href={renderedVideoUrl}
+                download
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download Export
+              </a>
+            </div>
+            <div className="aspect-video bg-black rounded-xl overflow-hidden border border-slate-800">
+              <video
+                src={renderedVideoUrl}
+                controls
+                className="w-full h-full object-contain"
+              />
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );
