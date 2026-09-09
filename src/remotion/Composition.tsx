@@ -178,7 +178,16 @@ export const MainReel: React.FC<MainReelProps> = ({ videoUrl, popups }) => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: "black" }}>
-      {cleanUrl ? <OffthreadVideo src={cleanUrl} /> : null}
+      {cleanUrl ? (
+        <OffthreadVideo
+          src={cleanUrl}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+          }}
+        />
+      ) : null}
 
       {safePopups.map((popup, i) => {
         const startSec = Number(popup.start_time);

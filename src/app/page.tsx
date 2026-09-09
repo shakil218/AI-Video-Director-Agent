@@ -873,9 +873,19 @@ export default function Home() {
                 <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                 <h2 className="text-sm font-semibold text-slate-200">Live Rendered Preview</h2>
               </div>
-              <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20">
-                Real-Time Remotion Canvas
-              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={videoUrl}
+                  download="source-video.mp4"
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs border border-slate-700 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-400" />
+                  Download Source
+                </a>
+                <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20">
+                  Real-Time Remotion Canvas
+                </span>
+              </div>
             </div>
             <div className="aspect-video bg-black rounded-xl overflow-hidden border border-slate-800">
               <Player
