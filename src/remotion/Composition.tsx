@@ -23,8 +23,8 @@ export interface PopupData {
     | "bottom-right"
     | string;
   theme?: "bold_clean" | "youtube_shorts" | string;
-  start_time: number;
-  end_time: number;
+  start_time: number | string;
+  end_time: number | string;
   start_frame?: number;
   end_frame?: number;
   duration_in_frames?: number;
