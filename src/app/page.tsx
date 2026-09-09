@@ -149,9 +149,15 @@ export default function Home() {
           }
         ]);
 
-        const incomingUrl = root?.renderedVideoUrl || root?.props?.videoUrl || root?.videoUrl;
-        if (incomingUrl) {
-          setRenderedVideoUrl(incomingUrl);
+        // Update videoUrl to the public/S3 hosted URL returned by n8n if available
+        const incomingVideoUrl = root?.videoUrl || root?.mediaUrl || root?.url || root?.publicUrl || root?.props?.videoUrl;
+        if (incomingVideoUrl) {
+          setVideoUrl(incomingVideoUrl);
+        }
+
+        const incomingRenderedUrl = root?.renderedVideoUrl;
+        if (incomingRenderedUrl) {
+          setRenderedVideoUrl(incomingRenderedUrl);
         }
       }
     } catch (err) {
@@ -186,6 +192,9 @@ export default function Home() {
       formData.append('action', 'revision');
       formData.append('sessionId', sessionId);
       formData.append('prompt', query);
+      if (videoUrl) {
+        formData.append('videoUrl', videoUrl);
+      }
       formData.append('currentOverlays', JSON.stringify(overlays));
 
       const url = `${webhookUrl}${webhookUrl.includes('?') ? '&' : '?'}action=revision`;
@@ -254,6 +263,10 @@ export default function Home() {
       const formData = new FormData();
       formData.append('action', 'render');
       formData.append('sessionId', sessionId);
+      if (videoUrl) {
+        formData.append('videoUrl', videoUrl);
+        formData.append('mediaUrl', videoUrl);
+      }
       formData.append('overlays', JSON.stringify(overlays));
 
       const url = `${webhookUrl}${webhookUrl.includes('?') ? '&' : '?'}action=render`;
