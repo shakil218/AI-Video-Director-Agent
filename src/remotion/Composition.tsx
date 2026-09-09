@@ -1,3 +1,4 @@
+// src/remotion/Composition.tsx
 import React from "react";
 import {
   AbsoluteFill,
