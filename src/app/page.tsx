@@ -49,6 +49,20 @@ export default function Home() {
   const [revisionInput, setRevisionInput] = useState<string>('');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [overlays, setOverlays] = useState<OverlayItem[]>([]);
+  // Keep a synchronous reference to the latest edit plan so actions such as
+  // Render and Revision never read a stale React state value.
+  const overlaysRef = useRef<OverlayItem[]>([]);
+
+  const updateOverlays = (
+    next: OverlayItem[] | ((prev: OverlayItem[]) => OverlayItem[])
+  ) => {
+    const resolved = typeof next === 'function'
+      ? next(overlaysRef.current)
+      : next;
+
+    overlaysRef.current = resolved;
+    setOverlays(resolved);
+  };
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<OverlayItem>({});
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
@@ -147,7 +161,7 @@ export default function Home() {
           type: item.type || 'popup'
         }));
 
-        setOverlays(normalizedOverlays);
+        updateOverlays(normalizedOverlays);
         setHasPlan(true);
 
         const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -227,7 +241,8 @@ export default function Home() {
         formData.append('videoUrl', revisionVideoUrl);
         formData.append('mediaUrl', revisionVideoUrl);
       }
-      formData.append('currentOverlays', JSON.stringify(overlays));
+      // Send the latest plan, not a potentially stale React state snapshot.
+      formData.append('currentOverlays', JSON.stringify(overlaysRef.current));
 
       const url = `${webhookUrl}${webhookUrl.includes('?') ? '&' : '?'}action=revision`;
 
@@ -247,14 +262,17 @@ export default function Home() {
           root?.items || 
           [];
 
-        if (rawOverlays.length > 0) {
-          const normalizedOverlays = rawOverlays.map((item, idx) => ({
-            ...item,
-            id: item.id || `overlay-${idx}-${Date.now()}`,
-            type: item.type || 'popup'
-          }));
-          setOverlays(normalizedOverlays);
-        }
+        const normalizedOverlays = rawOverlays.map((item, idx) => ({
+          ...item,
+          id: item.id || `overlay-${idx}-${Date.now()}`,
+          type: item.type || 'popup'
+        }));
+
+        // A successful revision always becomes the new authoritative plan.
+        // Do not keep the old plan merely because the response contains zero
+        // overlays; replacing the state avoids rendering stale V1 data.
+        updateOverlays(normalizedOverlays);
+        setHasPlan(normalizedOverlays.length > 0);
 
         const botMsg: ChatMessage = {
           id: (Date.now() + 1).toString(),
@@ -284,7 +302,9 @@ export default function Home() {
   };
 
   const handleRenderVideo = async () => {
-    if (overlays.length === 0 || isRendering) return;
+    const latestOverlays = overlaysRef.current;
+
+    if (latestOverlays.length === 0 || isRendering) return;
 
     // Render MUST use the permanent uploaded media URL.
     // Never send a browser blob: URL to n8n/Remotion.
@@ -319,7 +339,13 @@ export default function Home() {
       formData.append('sessionId', sessionId);
       formData.append('videoUrl', renderVideoUrl);
       formData.append('mediaUrl', renderVideoUrl);
-      formData.append('overlays', JSON.stringify(overlays));
+      console.log('[FRONTEND RENDER DIAGNOSTIC]', {
+        count: latestOverlays.length,
+        first: latestOverlays[0],
+        last: latestOverlays[latestOverlays.length - 1],
+      });
+
+      formData.append('overlays', JSON.stringify(latestOverlays));
 
       const url = `${webhookUrl}${webhookUrl.includes('?') ? '&' : '?'}action=render`;
 
@@ -368,7 +394,7 @@ export default function Home() {
     setMediaUrl(null);
     setVideoUrl(null);
     setHasPlan(false);
-    setOverlays([]);
+    updateOverlays([]);
     setChatMessages([]);
     setRenderedVideoUrl(null);
     setEditingId(null);
@@ -406,7 +432,7 @@ export default function Home() {
   };
 
   const saveEditing = (targetId: string) => {
-    setOverlays((prev) =>
+    updateOverlays((prev) =>
       prev.map((item) => (item.id === targetId ? { ...editFormData } : item))
     );
     setEditingId(null);
@@ -414,7 +440,7 @@ export default function Home() {
   };
 
   const handleDeleteOverlay = (targetId: string) => {
-    setOverlays((prev) => prev.filter((item) => item.id !== targetId));
+    updateOverlays((prev) => prev.filter((item) => item.id !== targetId));
   };
 
   const handleAddNewOverlay = () => {
@@ -423,7 +449,7 @@ export default function Home() {
       id: `overlay-manual-${Date.now()}`,
       type: newFormData.type || 'popup',
     };
-    setOverlays((prev) => [...prev, newItem]);
+    updateOverlays((prev) => [...prev, newItem]);
     setIsAddingNew(false);
     setNewFormData({
       headline: '',
