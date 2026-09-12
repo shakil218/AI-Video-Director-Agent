@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useId } from 'react';
 import { Player } from '@remotion/player';
 import Composition, { PopupData } from '@/remotion/Composition';
 import { VideoIngestion, EngineStatus } from '@/components/header/VideoIngestion';
@@ -30,6 +30,13 @@ interface ChatMessage {
 }
 
 export default function Home() {
+  const reactSessionId = useId();
+  const idSequenceRef = useRef(0);
+  const createStableId = (prefix: string) => {
+    idSequenceRef.current += 1;
+    return `${prefix}-${idSequenceRef.current}`;
+  };
+
   const [videoFile, setVideoFile] = useState<File | null>(null);
   // videoUrl is the URL used by the preview/player. After upload it becomes
   // the permanent public R2/S3 URL returned by n8n.
@@ -42,7 +49,9 @@ export default function Home() {
   const [isRendering, setIsRendering] = useState<boolean>(false);
   const [hasPlan, setHasPlan] = useState<boolean>(false);
   const [engineStatus, setEngineStatus] = useState<EngineStatus>('idle');
-  const [sessionId, setSessionId] = useState<string>('');
+  const [sessionId, setSessionId] = useState<string>(
+    () => `session_${reactSessionId.replace(/:/g, '')}`
+  );
   
   // Interactive UI States
   const [activeTab, setActiveTab] = useState<'all' | 'cuts' | 'broll' | 'popups'>('all');
@@ -66,6 +75,8 @@ export default function Home() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFormData, setEditFormData] = useState<OverlayItem>({});
   const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
+  const [renderProgress, setRenderProgress] = useState<number>(0);
+  const [renderStatus, setRenderStatus] = useState<'idle' | 'rendering' | 'completed' | 'error'>('idle');
 
   // Active Time Tracking & Manual Overlay Creation States
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -85,12 +96,58 @@ export default function Home() {
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setSessionId(`session_${Date.now()}`);
-  }, []);
-
-  useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
+
+  const renderEngineUrl =
+    process.env.NEXT_PUBLIC_RENDER_ENGINE_URL || 'http://localhost:5000';
+
+  useEffect(() => {
+    if (!isRendering || !sessionId) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const pollProgress = async () => {
+      try {
+        const response = await fetch(
+          `${renderEngineUrl}/render-progress/${encodeURIComponent(sessionId)}`,
+          { cache: 'no-store' }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          const percent = Math.max(0, Math.min(100, Number(data?.progress) || 0));
+
+          if (!cancelled) {
+            setRenderProgress(percent);
+
+            if (data?.status === 'completed') {
+              setRenderStatus('completed');
+              if (data?.mediaUrl) setRenderedVideoUrl(data.mediaUrl);
+            } else if (data?.status === 'error') {
+              setRenderStatus('error');
+            } else {
+              setRenderStatus('rendering');
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('[Render Progress] Poll failed:', error);
+      }
+
+      if (!cancelled) {
+        timer = setTimeout(pollProgress, 1000);
+      }
+    };
+
+    void pollProgress();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [isRendering, sessionId, renderEngineUrl]);
 
   // Video Time Update Listener for Sync & Highlight
   useEffect(() => {
@@ -120,6 +177,8 @@ export default function Home() {
     setMediaUrl(null);
     setVideoUrl(localPreviewUrl);
     setRenderedVideoUrl(null);
+    setRenderProgress(0);
+    setRenderStatus('idle');
     setEngineStatus('ready');
   };
 
@@ -157,7 +216,7 @@ export default function Home() {
 
         const normalizedOverlays = rawOverlays.map((item, idx) => ({
           ...item,
-          id: item.id || `overlay-${idx}-${Date.now()}`,
+          id: item.id || createStableId(`overlay-${idx}`),
           type: item.type || 'popup'
         }));
 
@@ -218,7 +277,7 @@ export default function Home() {
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const userMsg: ChatMessage = {
-      id: Date.now().toString(),
+      id: createStableId('message-user'),
       sender: 'user',
       time: now,
       text: query
@@ -264,7 +323,7 @@ export default function Home() {
 
         const normalizedOverlays = rawOverlays.map((item, idx) => ({
           ...item,
-          id: item.id || `overlay-${idx}-${Date.now()}`,
+          id: item.id || createStableId(`overlay-${idx}`),
           type: item.type || 'popup'
         }));
 
@@ -275,7 +334,7 @@ export default function Home() {
         setHasPlan(normalizedOverlays.length > 0);
 
         const botMsg: ChatMessage = {
-          id: (Date.now() + 1).toString(),
+          id: createStableId('message-bot'),
           sender: 'bot',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           text: root?.message || `Revision applied! Updated edit plan with ${rawOverlays.length} props.`,
@@ -289,7 +348,7 @@ export default function Home() {
     } catch (err) {
       console.error('Error executing revision prompt:', err);
       const errorMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
+        id: createStableId('message-error'),
         sender: 'bot',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         text: 'Failed to execute revision request. Ensure n8n workflow is active and accepting requests.',
@@ -318,7 +377,7 @@ export default function Home() {
       setChatMessages((prev) => [
         ...prev,
         {
-          id: Date.now().toString(),
+          id: createStableId('message-render-error'),
           sender: 'bot',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           text: message,
@@ -329,6 +388,8 @@ export default function Home() {
     }
 
     setIsRendering(true);
+    setRenderProgress(0);
+    setRenderStatus('rendering');
 
     try {
       const webhookUrl = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL;
@@ -363,11 +424,14 @@ export default function Home() {
           setRenderedVideoUrl(incomingUrl);
         }
 
+        setRenderProgress(100);
+        setRenderStatus('completed');
+
         const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         setChatMessages((prev) => [
           ...prev,
           {
-            id: Date.now().toString(),
+            id: createStableId('message-render-complete'),
             sender: 'bot',
             time: now,
             text: root?.message || 'Video rendering complete! You can watch or download the rendered output directly below.',
@@ -379,6 +443,7 @@ export default function Home() {
       }
     } catch (err) {
       console.error('Error triggering video render:', err);
+      setRenderStatus('error');
     } finally {
       setIsRendering(false);
     }
@@ -388,7 +453,7 @@ export default function Home() {
     if (previewUrl?.startsWith('blob:')) {
       URL.revokeObjectURL(previewUrl);
     }
-    setSessionId(`session_${Date.now()}`);
+    setSessionId(createStableId('session'));
     setVideoFile(null);
     setPreviewUrl(null);
     setMediaUrl(null);
@@ -397,6 +462,8 @@ export default function Home() {
     updateOverlays([]);
     setChatMessages([]);
     setRenderedVideoUrl(null);
+    setRenderProgress(0);
+    setRenderStatus('idle');
     setEditingId(null);
     setEngineStatus('idle');
     setIsAddingNew(false);
@@ -446,7 +513,7 @@ export default function Home() {
   const handleAddNewOverlay = () => {
     const newItem: OverlayItem = {
       ...newFormData,
-      id: `overlay-manual-${Date.now()}`,
+      id: createStableId('overlay-manual'),
       type: newFormData.type || 'popup',
     };
     updateOverlays((prev) => [...prev, newItem]);
@@ -691,6 +758,38 @@ export default function Home() {
               </div>
             </div>
 
+            {(isRendering || renderProgress > 0) && (
+              <div className="mt-3 rounded-xl border border-emerald-500/30 bg-slate-950/80 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    {isRendering ? (
+                      <Loader2 className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
+                    ) : renderStatus === 'completed' ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : (
+                      <Film className="w-3.5 h-3.5 text-emerald-400" />
+                    )}
+                    <span className="text-[11px] font-semibold text-slate-200">
+                      {renderStatus === 'completed' ? 'Render Complete' : renderStatus === 'error' ? 'Render Error' : 'Rendering Video'}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-mono text-emerald-400">{renderProgress}%</span>
+                </div>
+
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all duration-300 ease-out"
+                    style={{ width: `${renderProgress}%` }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
+                  <span>Remotion render progress</span>
+                  <span>{isRendering ? 'Live' : renderStatus === 'completed' ? 'Done' : 'Stopped'}</span>
+                </div>
+              </div>
+            )}
+
             {/* Category Filter Tabs */}
             {hasPlan && (
               <div className="flex items-center justify-between py-2 text-xs font-mono border-b border-slate-800/60">
@@ -749,7 +848,7 @@ export default function Home() {
                 <div className="grid grid-cols-4 gap-2 text-[10px]">
                   <select
                     value={newFormData.type || 'popup'}
-                    onChange={(e) => setNewFormData({ ...newFormData, type: e.target.value as any })}
+                    onChange={(e) => setNewFormData({ ...newFormData, type: e.target.value as OverlayItem['type'] })}
                     className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
                   >
                     <option value="popup">Popup</option>
@@ -854,7 +953,7 @@ export default function Home() {
                         <div className="grid grid-cols-4 gap-2 text-[10px]">
                           <select
                             value={editFormData.type || 'popup'}
-                            onChange={(e) => setEditFormData({ ...editFormData, type: e.target.value as any })}
+                            onChange={(e) => setEditFormData({ ...editFormData, type: e.target.value as OverlayItem['type'] })}
                             className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
                           >
                             <option value="popup">Popup</option>
@@ -980,7 +1079,7 @@ export default function Home() {
                 </span>
               </div>
             </div>
-            <div className="aspect-video bg-black rounded-xl overflow-hidden border border-slate-800">
+            <div className="aspect-9/16 w-full max-w-md mx-auto bg-black rounded-xl overflow-hidden border border-slate-800">
               <Player
                 component={Composition}
                 inputProps={{
@@ -989,8 +1088,8 @@ export default function Home() {
                 }}
                 durationInFrames={1800}
                 fps={30}
-                compositionWidth={1920}
-                compositionHeight={1080}
+                compositionWidth={1080}
+                compositionHeight={1920}
                 style={{ width: '100%', height: '100%' }}
                 controls
               />
@@ -1017,7 +1116,7 @@ export default function Home() {
                 Download Export
               </a>
             </div>
-            <div className="aspect-video bg-black rounded-xl overflow-hidden border border-slate-800">
+            <div className="aspect-9/16 w-full max-w-md mx-auto bg-black rounded-xl overflow-hidden border border-slate-800">
               <video
                 src={renderedVideoUrl}
                 controls
