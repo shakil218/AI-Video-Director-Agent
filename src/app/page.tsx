@@ -13,7 +13,6 @@ import {
 interface OverlayItem {
   id?: string;
   headline?: string;
-  subtext?: string;
   position?: string;
   theme?: string;
   start_time?: number | string;
@@ -83,7 +82,6 @@ export default function Home() {
   const [isAddingNew, setIsAddingNew] = useState<boolean>(false);
   const [newFormData, setNewFormData] = useState<OverlayItem>({
     headline: '',
-    subtext: '',
     position: 'bottom-center',
     theme: 'bold_clean',
     start_time: 0,
@@ -215,8 +213,12 @@ export default function Home() {
           [];
 
         const normalizedOverlays = rawOverlays.map((item, idx) => ({
-          ...item,
           id: item.id || createStableId(`overlay-${idx}`),
+          headline: typeof item.headline === 'string' ? item.headline : '',
+          position: item.position,
+          theme: item.theme,
+          start_time: item.start_time,
+          end_time: item.end_time,
           type: item.type || 'popup'
         }));
 
@@ -322,8 +324,12 @@ export default function Home() {
           [];
 
         const normalizedOverlays = rawOverlays.map((item, idx) => ({
-          ...item,
           id: item.id || createStableId(`overlay-${idx}`),
+          headline: typeof item.headline === 'string' ? item.headline : '',
+          position: item.position,
+          theme: item.theme,
+          start_time: item.start_time,
+          end_time: item.end_time,
           type: item.type || 'popup'
         }));
 
@@ -520,8 +526,7 @@ export default function Home() {
     setIsAddingNew(false);
     setNewFormData({
       headline: '',
-      subtext: '',
-      position: 'bottom-center',
+        position: 'bottom-center',
       theme: 'bold_clean',
       start_time: Math.floor(currentTime),
       end_time: Math.floor(currentTime) + 5,
@@ -829,19 +834,12 @@ export default function Home() {
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2">
                   <input
                     type="text"
                     value={newFormData.headline || ''}
                     onChange={(e) => setNewFormData({ ...newFormData, headline: e.target.value })}
-                    placeholder="Headline"
-                    className="bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white"
-                  />
-                  <input
-                    type="text"
-                    value={newFormData.subtext || ''}
-                    onChange={(e) => setNewFormData({ ...newFormData, subtext: e.target.value })}
-                    placeholder="Subtext"
+                    placeholder="Spoken line"
                     className="bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white"
                   />
                 </div>
@@ -933,19 +931,12 @@ export default function Home() {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 gap-2">
                           <input
                             type="text"
                             value={editFormData.headline || ''}
                             onChange={(e) => setEditFormData({ ...editFormData, headline: e.target.value })}
-                            placeholder="Headline"
-                            className="bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white"
-                          />
-                          <input
-                            type="text"
-                            value={editFormData.subtext || ''}
-                            onChange={(e) => setEditFormData({ ...editFormData, subtext: e.target.value })}
-                            placeholder="Subtext"
+                            placeholder="Spoken line"
                             className="bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white"
                           />
                         </div>
@@ -1041,10 +1032,6 @@ export default function Home() {
                       {item.headline && (
                         <h3 className="text-xs font-semibold text-slate-100">{item.headline}</h3>
                       )}
-                      {item.subtext && (
-                        <p className="text-[11px] text-slate-400 mt-0.5 leading-normal">{item.subtext}</p>
-                      )}
-
                       <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] font-mono text-slate-500">
                         <span>Pos: {item.position || 'bottom-center'}</span>
                         <span>Theme: {item.theme || 'bold_clean'}</span>
@@ -1120,6 +1107,7 @@ export default function Home() {
               <video
                 src={renderedVideoUrl}
                 controls
+                playsInline
                 className="w-full h-full object-contain"
               />
             </div>
