@@ -15,10 +15,67 @@ interface OverlayItem {
   headline?: string;
   position?: string;
   theme?: string;
+  highlightColor?: 'green' | 'red' | 'blue' | 'yellow' | string;
+  highlightText?: string;
+  fontFamily?: string;
   start_time?: number | string;
   end_time?: number | string;
   type?: 'cut' | 'broll' | 'popup';
 }
+
+const THEME_OPTIONS = [
+  { value: 'bold_clean', label: 'Bold Clean' },
+  { value: 'bangla_reel', label: 'Bangla Reel' },
+];
+
+const FONT_OPTIONS = [
+  { value: 'Hind Siliguri', label: 'Hind Siliguri' },
+  { value: 'Noto Sans Bengali', label: 'Noto Sans Bengali' },
+  { value: 'Anek Bangla', label: 'Anek Bangla' },
+];
+
+const HIGHLIGHT_COLORS = [
+  { value: 'green', label: 'Green', swatch: '#B7F000' },
+  { value: 'red', label: 'Red', swatch: '#FF3B30' },
+  { value: 'blue', label: 'Blue', swatch: '#28A9FF' },
+  { value: 'yellow', label: 'Yellow', swatch: '#FFD60A' },
+];
+
+const DEFAULT_THEME = 'bangla_reel';
+const DEFAULT_FONT_FAMILY = 'Hind Siliguri';
+const DEFAULT_HIGHLIGHT_COLOR = 'green';
+
+const normalizeOverlayItem = (
+  item: Partial<OverlayItem> | null | undefined,
+  fallback?: Partial<OverlayItem>
+): OverlayItem => {
+  const source = item || {};
+  const previous = fallback || {};
+
+  return {
+    id: source.id || previous.id,
+    headline: typeof source.headline === 'string'
+      ? source.headline
+      : (previous.headline || ''),
+    position: source.position || previous.position || 'center',
+    theme: source.theme || previous.theme || DEFAULT_THEME,
+    highlightColor:
+      source.highlightColor ||
+      previous.highlightColor ||
+      DEFAULT_HIGHLIGHT_COLOR,
+    highlightText:
+      typeof source.highlightText === 'string'
+        ? source.highlightText
+        : (previous.highlightText || ''),
+    fontFamily:
+      source.fontFamily ||
+      previous.fontFamily ||
+      DEFAULT_FONT_FAMILY,
+    start_time: source.start_time ?? previous.start_time ?? 0,
+    end_time: source.end_time ?? previous.end_time ?? 5,
+    type: source.type || previous.type || 'popup',
+  };
+};
 
 interface ChatMessage {
   id: string;
@@ -82,8 +139,11 @@ export default function Home() {
   const [isAddingNew, setIsAddingNew] = useState<boolean>(false);
   const [newFormData, setNewFormData] = useState<OverlayItem>({
     headline: '',
-    position: 'bottom-center',
-    theme: 'bold_clean',
+    position: 'center',
+    theme: DEFAULT_THEME,
+    highlightColor: DEFAULT_HIGHLIGHT_COLOR,
+    highlightText: '',
+    fontFamily: DEFAULT_FONT_FAMILY,
     start_time: 0,
     end_time: 5,
     type: 'popup'
@@ -212,15 +272,11 @@ export default function Home() {
           root?.items || 
           [];
 
-        const normalizedOverlays = rawOverlays.map((item, idx) => ({
-          id: item.id || createStableId(`overlay-${idx}`),
-          headline: typeof item.headline === 'string' ? item.headline : '',
-          position: item.position,
-          theme: item.theme,
-          start_time: item.start_time,
-          end_time: item.end_time,
-          type: item.type || 'popup'
-        }));
+        const normalizedOverlays = rawOverlays.map((item, idx) =>
+          normalizeOverlayItem(item, {
+            id: createStableId(`overlay-${idx}`),
+          })
+        );
 
         updateOverlays(normalizedOverlays);
         setHasPlan(true);
@@ -323,15 +379,13 @@ export default function Home() {
           root?.items || 
           [];
 
-        const normalizedOverlays = rawOverlays.map((item, idx) => ({
-          id: item.id || createStableId(`overlay-${idx}`),
-          headline: typeof item.headline === 'string' ? item.headline : '',
-          position: item.position,
-          theme: item.theme,
-          start_time: item.start_time,
-          end_time: item.end_time,
-          type: item.type || 'popup'
-        }));
+        const previousOverlays = overlaysRef.current;
+        const normalizedOverlays = rawOverlays.map((item, idx) =>
+          normalizeOverlayItem(item, {
+            ...(previousOverlays[idx] || {}),
+            id: previousOverlays[idx]?.id || createStableId(`overlay-${idx}`),
+          })
+        );
 
         // A successful revision always becomes the new authoritative plan.
         // Do not keep the old plan merely because the response contains zero
@@ -506,7 +560,11 @@ export default function Home() {
 
   const saveEditing = (targetId: string) => {
     updateOverlays((prev) =>
-      prev.map((item) => (item.id === targetId ? { ...editFormData } : item))
+      prev.map((item) =>
+        item.id === targetId
+          ? normalizeOverlayItem({ ...item, ...editFormData }, item)
+          : item
+      )
     );
     setEditingId(null);
     setEditFormData({});
@@ -517,18 +575,23 @@ export default function Home() {
   };
 
   const handleAddNewOverlay = () => {
-    const newItem: OverlayItem = {
-      ...newFormData,
-      id: createStableId('overlay-manual'),
-      type: newFormData.type || 'popup',
-    };
+    const newItem = normalizeOverlayItem(
+      {
+        ...newFormData,
+        id: createStableId('overlay-manual'),
+        type: newFormData.type || 'popup',
+      }
+    );
     updateOverlays((prev) => [...prev, newItem]);
     setIsAddingNew(false);
     setNewFormData({
       headline: '',
-        position: 'bottom-center',
-      theme: 'bold_clean',
-      start_time: Math.floor(currentTime),
+        position: 'center',
+        theme: DEFAULT_THEME,
+        highlightColor: DEFAULT_HIGHLIGHT_COLOR,
+        highlightText: '',
+        fontFamily: DEFAULT_FONT_FAMILY,
+        start_time: Math.floor(currentTime),
       end_time: Math.floor(currentTime) + 5,
       type: 'popup'
     });
@@ -843,7 +906,7 @@ export default function Home() {
                     className="bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white"
                   />
                 </div>
-                <div className="grid grid-cols-4 gap-2 text-[10px]">
+                <div className="grid grid-cols-2 gap-2 text-[10px]">
                   <select
                     value={newFormData.type || 'popup'}
                     onChange={(e) => setNewFormData({ ...newFormData, type: e.target.value as OverlayItem['type'] })}
@@ -853,6 +916,34 @@ export default function Home() {
                     <option value="broll">Broll</option>
                     <option value="cut">Cut</option>
                   </select>
+                  <select
+                    value={newFormData.theme || 'bangla_reel'}
+                    onChange={(e) => setNewFormData({ ...newFormData, theme: e.target.value })}
+                    className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                  >
+                    {THEME_OPTIONS.map((theme) => <option key={theme.value} value={theme.value}>{theme.label}</option>)}
+                  </select>
+                  <select
+                    value={newFormData.fontFamily || 'Hind Siliguri'}
+                    onChange={(e) => setNewFormData({ ...newFormData, fontFamily: e.target.value })}
+                    className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                  >
+                    {FONT_OPTIONS.map((font) => <option key={font.value} value={font.value}>{font.label}</option>)}
+                  </select>
+                  <select
+                    value={newFormData.highlightColor || 'green'}
+                    onChange={(e) => setNewFormData({ ...newFormData, highlightColor: e.target.value })}
+                    className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                  >
+                    {HIGHLIGHT_COLORS.map((color) => <option key={color.value} value={color.value}>{color.label}</option>)}
+                  </select>
+                  <input
+                    type="text"
+                    value={newFormData.highlightText || ''}
+                    onChange={(e) => setNewFormData({ ...newFormData, highlightText: e.target.value })}
+                    placeholder="Highlight word/phrase (optional)"
+                    className="bg-slate-900 border border-slate-700 rounded p-1 text-white col-span-2"
+                  />
                   <input
                     type="text"
                     value={newFormData.position || ''}
@@ -860,20 +951,22 @@ export default function Home() {
                     placeholder="Position"
                     className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
                   />
-                  <input
-                    type="text"
-                    value={newFormData.start_time ?? ''}
-                    onChange={(e) => setNewFormData({ ...newFormData, start_time: e.target.value })}
-                    placeholder="Start (s)"
-                    className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                  />
-                  <input
-                    type="text"
-                    value={newFormData.end_time ?? ''}
-                    onChange={(e) => setNewFormData({ ...newFormData, end_time: e.target.value })}
-                    placeholder="End (s)"
-                    className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={newFormData.start_time ?? ''}
+                      onChange={(e) => setNewFormData({ ...newFormData, start_time: e.target.value })}
+                      placeholder="Start (s)"
+                      className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                    />
+                    <input
+                      type="text"
+                      value={newFormData.end_time ?? ''}
+                      onChange={(e) => setNewFormData({ ...newFormData, end_time: e.target.value })}
+                      placeholder="End (s)"
+                      className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                    />
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -941,7 +1034,7 @@ export default function Home() {
                           />
                         </div>
 
-                        <div className="grid grid-cols-4 gap-2 text-[10px]">
+                        <div className="grid grid-cols-2 gap-2 text-[10px]">
                           <select
                             value={editFormData.type || 'popup'}
                             onChange={(e) => setEditFormData({ ...editFormData, type: e.target.value as OverlayItem['type'] })}
@@ -951,6 +1044,34 @@ export default function Home() {
                             <option value="broll">Broll</option>
                             <option value="cut">Cut</option>
                           </select>
+                          <select
+                            value={editFormData.theme || 'bangla_reel'}
+                            onChange={(e) => setEditFormData({ ...editFormData, theme: e.target.value })}
+                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                          >
+                            {THEME_OPTIONS.map((theme) => <option key={theme.value} value={theme.value}>{theme.label}</option>)}
+                          </select>
+                          <select
+                            value={editFormData.fontFamily || 'Hind Siliguri'}
+                            onChange={(e) => setEditFormData({ ...editFormData, fontFamily: e.target.value })}
+                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                          >
+                            {FONT_OPTIONS.map((font) => <option key={font.value} value={font.value}>{font.label}</option>)}
+                          </select>
+                          <select
+                            value={editFormData.highlightColor || 'green'}
+                            onChange={(e) => setEditFormData({ ...editFormData, highlightColor: e.target.value })}
+                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                          >
+                            {HIGHLIGHT_COLORS.map((color) => <option key={color.value} value={color.value}>{color.label}</option>)}
+                          </select>
+                          <input
+                            type="text"
+                            value={editFormData.highlightText || ''}
+                            onChange={(e) => setEditFormData({ ...editFormData, highlightText: e.target.value })}
+                            placeholder="Highlight word/phrase (optional)"
+                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white col-span-2"
+                          />
                           <input
                             type="text"
                             value={editFormData.position || ''}
@@ -958,20 +1079,22 @@ export default function Home() {
                             placeholder="Position"
                             className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
                           />
-                          <input
-                            type="text"
-                            value={editFormData.start_time ?? ''}
-                            onChange={(e) => setEditFormData({ ...editFormData, start_time: e.target.value })}
-                            placeholder="Start (s)"
-                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                          />
-                          <input
-                            type="text"
-                            value={editFormData.end_time ?? ''}
-                            onChange={(e) => setEditFormData({ ...editFormData, end_time: e.target.value })}
-                            placeholder="End (s)"
-                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              value={editFormData.start_time ?? ''}
+                              onChange={(e) => setEditFormData({ ...editFormData, start_time: e.target.value })}
+                              placeholder="Start (s)"
+                              className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                            />
+                            <input
+                              type="text"
+                              value={editFormData.end_time ?? ''}
+                              onChange={(e) => setEditFormData({ ...editFormData, end_time: e.target.value })}
+                              placeholder="End (s)"
+                              className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                            />
+                          </div>
                         </div>
                       </div>
                     );
@@ -1036,6 +1159,14 @@ export default function Home() {
                         <span>Pos: {item.position || 'bottom-center'}</span>
                         <span>Theme: {item.theme || 'bold_clean'}</span>
                       </div>
+                      <div className="mt-1 text-[10px] font-mono text-slate-500 flex items-center justify-between gap-2">
+                        <span>Font: {item.fontFamily || DEFAULT_FONT_FAMILY}</span>
+                        <span>
+                          {item.theme === 'bangla_reel'
+                            ? `Accent: ${item.highlightColor || DEFAULT_HIGHLIGHT_COLOR}`
+                            : 'Accent: —'}
+                        </span>
+                      </div>
                     </div>
                   );
                 })
@@ -1070,8 +1201,10 @@ export default function Home() {
               <Player
                 component={Composition}
                 inputProps={{
-                  videoUrl: videoUrl,
-                  popups: overlays as unknown as PopupData[],
+                  videoUrl,
+                  popups: overlays.map((item) => ({
+                    ...item,
+                  })) as unknown as PopupData[],
                 }}
                 durationInFrames={1800}
                 fps={30}
