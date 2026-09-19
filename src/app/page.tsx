@@ -45,6 +45,16 @@ const DEFAULT_THEME = 'bangla_reel';
 const DEFAULT_FONT_FAMILY = 'Hind Siliguri';
 const DEFAULT_HIGHLIGHT_COLOR = 'green';
 
+// Reel format (Instagram / TikTok style vertical video).
+// These MUST match the Remotion <Composition> registered for the final render.
+const REEL_WIDTH = 1080;
+const REEL_HEIGHT = 1920;
+const REEL_FPS = 30;
+// Used only until the real video duration is known from the video metadata.
+const FALLBACK_DURATION_IN_FRAMES = 1800;
+// Max on-screen width of the phone-shaped preview frames (CSS px).
+const PREVIEW_MAX_WIDTH_PX = 360;
+
 const normalizeOverlayItem = (
   item: Partial<OverlayItem> | null | undefined,
   fallback?: Partial<OverlayItem>
@@ -136,6 +146,8 @@ export default function Home() {
 
   // Active Time Tracking & Manual Overlay Creation States
   const [currentTime, setCurrentTime] = useState<number>(0);
+  // Real duration (seconds) of the uploaded video, used to size the Player timeline.
+  const [videoDuration, setVideoDuration] = useState<number>(0);
   const [isAddingNew, setIsAddingNew] = useState<boolean>(false);
   const [newFormData, setNewFormData] = useState<OverlayItem>({
     headline: '',
@@ -216,9 +228,23 @@ export default function Home() {
       setCurrentTime(videoEl.currentTime);
     };
 
+    const handleMetadata = () => {
+      if (Number.isFinite(videoEl.duration) && videoEl.duration > 0) {
+        setVideoDuration(videoEl.duration);
+      }
+    };
+
     videoEl.addEventListener('timeupdate', handleTimeUpdate);
+    videoEl.addEventListener('loadedmetadata', handleMetadata);
+    videoEl.addEventListener('durationchange', handleMetadata);
+
+    // Metadata may already be loaded before this effect attached its listeners.
+    if (videoEl.readyState >= 1) handleMetadata();
+
     return () => {
       videoEl.removeEventListener('timeupdate', handleTimeUpdate);
+      videoEl.removeEventListener('loadedmetadata', handleMetadata);
+      videoEl.removeEventListener('durationchange', handleMetadata);
     };
   }, [videoUrl]);
 
@@ -234,6 +260,7 @@ export default function Home() {
     setPreviewUrl(localPreviewUrl);
     setMediaUrl(null);
     setVideoUrl(localPreviewUrl);
+    setVideoDuration(0);
     setRenderedVideoUrl(null);
     setRenderProgress(0);
     setRenderStatus('idle');
@@ -518,6 +545,7 @@ export default function Home() {
     setPreviewUrl(null);
     setMediaUrl(null);
     setVideoUrl(null);
+    setVideoDuration(0);
     setHasPlan(false);
     updateOverlays([]);
     setChatMessages([]);
@@ -546,6 +574,25 @@ export default function Home() {
       return true;
     });
   }, [overlays, activeTab]);
+
+  // Player timeline length follows the real uploaded video (falls back to 60s).
+  const durationInFrames = useMemo(() => {
+    if (videoDuration > 0) {
+      return Math.max(1, Math.ceil(videoDuration * REEL_FPS));
+    }
+    return FALLBACK_DURATION_IN_FRAMES;
+  }, [videoDuration]);
+
+  // Props consumed by Composition.tsx. Theme / font / highlight color live on
+  // each overlay item (theme, fontFamily, highlightColor), so they are already
+  // included in `popups` and are not stripped here.
+  const playerInputProps = useMemo(
+    () => ({
+      videoUrl: videoUrl ?? '',
+      popups: overlays.map((item) => ({ ...item })) as unknown as PopupData[],
+    }),
+    [videoUrl, overlays]
+  );
 
   const startEditing = (item: OverlayItem) => {
     if (!item.id) return;
@@ -586,12 +633,12 @@ export default function Home() {
     setIsAddingNew(false);
     setNewFormData({
       headline: '',
-        position: 'center',
-        theme: DEFAULT_THEME,
-        highlightColor: DEFAULT_HIGHLIGHT_COLOR,
-        highlightText: '',
-        fontFamily: DEFAULT_FONT_FAMILY,
-        start_time: Math.floor(currentTime),
+      position: 'center',
+      theme: DEFAULT_THEME,
+      highlightColor: DEFAULT_HIGHLIGHT_COLOR,
+      highlightText: '',
+      fontFamily: DEFAULT_FONT_FAMILY,
+      start_time: Math.floor(currentTime),
       end_time: Math.floor(currentTime) + 5,
       type: 'popup'
     });
@@ -1197,20 +1244,24 @@ export default function Home() {
                 </span>
               </div>
             </div>
-            <div className="aspect-9/16 w-full max-w-md mx-auto bg-black rounded-xl overflow-hidden border border-slate-800">
+            {/* 9:16 Reel frame. overflow-hidden clips anything that would escape the frame. */}
+            <div
+              className="relative mx-auto w-full overflow-hidden rounded-xl border border-slate-800 bg-black"
+              style={{ maxWidth: `${PREVIEW_MAX_WIDTH_PX}px` }}
+            >
               <Player
                 component={Composition}
-                inputProps={{
-                  videoUrl,
-                  popups: overlays.map((item) => ({
-                    ...item,
-                  })) as unknown as PopupData[],
+                inputProps={playerInputProps}
+                durationInFrames={durationInFrames}
+                fps={REEL_FPS}
+                compositionWidth={REEL_WIDTH}
+                compositionHeight={REEL_HEIGHT}
+                style={{
+                  width: '100%',
+                  aspectRatio: '9 / 16',
+                  margin: '0 auto',
+                  overflow: 'hidden',
                 }}
-                durationInFrames={1800}
-                fps={30}
-                compositionWidth={1080}
-                compositionHeight={1920}
-                style={{ width: '100%', height: '100%' }}
                 controls
               />
             </div>
@@ -1236,7 +1287,10 @@ export default function Home() {
                 Download Export
               </a>
             </div>
-            <div className="aspect-9/16 w-full max-w-md mx-auto bg-black rounded-xl overflow-hidden border border-slate-800">
+            <div
+              className="relative mx-auto w-full overflow-hidden rounded-xl border border-slate-800 bg-black"
+              style={{ maxWidth: `${PREVIEW_MAX_WIDTH_PX}px`, aspectRatio: '9 / 16' }}
+            >
               <video
                 src={renderedVideoUrl}
                 controls

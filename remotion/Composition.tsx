@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill, Sequence, OffthreadVideo, useVideoConfig } from "remotion";
+import { Sequence, OffthreadVideo, useVideoConfig } from "remotion";
 import { MainReelProps } from "./types";
 import { PopupOverlay } from "./components/PopupOverlay";
 
@@ -45,9 +45,29 @@ export const MainReel: React.FC<MainReelProps> = ({ videoUrl, popups = [] }) => 
   }
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "black" }}>
+    <div
+      style={{
+        position: "relative",
+        width: 1080,
+        height: 1920,
+        overflow: "hidden",
+        backgroundColor: "black",
+      }}
+    >
       {/* Pass direct HTTPS URL; avoid relative /api/proxy-video routes in Remotion backend */}
-      {finalUrl ? <OffthreadVideo src={finalUrl} /> : null}
+      {finalUrl ? (
+        <OffthreadVideo
+          src={finalUrl}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
+      ) : null}
 
       {safePopups.map((popup, i) => {
         const startSec = Number(popup.start_time);
@@ -71,7 +91,7 @@ export const MainReel: React.FC<MainReelProps> = ({ videoUrl, popups = [] }) => 
           </Sequence>
         );
       })}
-    </AbsoluteFill>
+    </div>
   );
 };
 

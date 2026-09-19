@@ -3,15 +3,15 @@ import { useCurrentFrame, useVideoConfig, spring, interpolate, AbsoluteFill } fr
 import { PopupItem } from "../types";
 
 const POSITION_STYLES: Record<string, React.CSSProperties> = {
-  top: { justifyContent: "flex-start", alignItems: "center", paddingTop: "10vh" },
-  "top-left": { justifyContent: "flex-start", alignItems: "flex-start", paddingTop: "10vh", paddingLeft: "30px" },
-  "top-right": { justifyContent: "flex-start", alignItems: "flex-end", paddingTop: "10vh", paddingRight: "30px" },
+  top: { justifyContent: "flex-start", alignItems: "center", paddingTop: 192 },
+  "top-left": { justifyContent: "flex-start", alignItems: "flex-start", paddingTop: 192 },
+  "top-right": { justifyContent: "flex-start", alignItems: "flex-end", paddingTop: 192 },
   center: { justifyContent: "center", alignItems: "center" },
-  "center-left": { justifyContent: "center", alignItems: "flex-start", paddingLeft: "30px" },
-  "center-right": { justifyContent: "center", alignItems: "flex-end", paddingRight: "30px" },
-  bottom: { justifyContent: "flex-end", alignItems: "center", paddingBottom: "10vh" },
-  "bottom-left": { justifyContent: "flex-end", alignItems: "flex-start", paddingBottom: "10vh", paddingLeft: "30px" },
-  "bottom-right": { justifyContent: "flex-end", alignItems: "flex-end", paddingBottom: "10vh", paddingRight: "30px" },
+  "center-left": { justifyContent: "center", alignItems: "flex-start" },
+  "center-right": { justifyContent: "center", alignItems: "flex-end" },
+  bottom: { justifyContent: "flex-end", alignItems: "center", paddingBottom: 192 },
+  "bottom-left": { justifyContent: "flex-end", alignItems: "flex-start", paddingBottom: 192 },
+  "bottom-right": { justifyContent: "flex-end", alignItems: "flex-end", paddingBottom: 192 },
 };
 
 const THEME_STYLES: Record<
@@ -30,7 +30,7 @@ const THEME_STYLES: Record<
       padding: "20px 32px",
       boxShadow: "0 20px 30px rgba(0, 0, 0, 0.6)",
       backdropFilter: "blur(10px)",
-      maxWidth: "85%",
+      maxWidth: "100%",
     },
     headline: {
       fontSize: 48,
@@ -55,7 +55,7 @@ const THEME_STYLES: Record<
       borderRadius: 16,
       padding: "18px 28px",
       border: "2px solid rgba(255, 255, 255, 0.3)",
-      maxWidth: "90%",
+      maxWidth: "100%",
     },
     headline: {
       fontSize: 54,
@@ -126,6 +126,11 @@ export const PopupOverlay: React.FC<{ item: PopupItem; durationInFrames: number 
         style={{
           opacity,
           transform: transformStyle,
+          width: "100%",
+          maxWidth: 960,
+          maxHeight: 1536,
+          boxSizing: "border-box",
+          overflow: "hidden",
           ...activeTheme.container,
           ...(item.bgColor ? { backgroundColor: item.bgColor } : {}),
           ...(item.borderColor ? { borderColor: item.borderColor } : {}),
@@ -151,6 +156,9 @@ export const PopupOverlay: React.FC<{ item: PopupItem; durationInFrames: number 
           style={{
             margin: "0",
             ...activeTheme.headline,
+            maxWidth: "100%",
+            overflowWrap: "anywhere",
+            wordBreak: "break-word",
             ...(item.textColor ? { color: item.textColor } : {}),
           }}
         >

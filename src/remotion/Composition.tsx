@@ -40,6 +40,7 @@ export type PopupPosition =
   | string;
 
 export interface PopupData {
+  [key: string]: unknown;
   headline: string;
   position?: PopupPosition;
   theme?: PopupTheme;
@@ -73,86 +74,84 @@ const HIGHLIGHT_COLORS: Record<string, string> = {
 const POSITION_STYLES: Record<string, React.CSSProperties> = {
   top: {
     position: "absolute",
-    top: "10%",
-    left: "50%",
-    width: "88%",
-    transform: "translateX(-50%)",
+    top: 192,
+    left: 60,
+    right: 60,
     alignItems: "center",
   },
   "top-left": {
     position: "absolute",
-    top: "10%",
-    left: "6%",
-    width: "88%",
+    top: 192,
+    left: 60,
+    right: 60,
     alignItems: "flex-start",
   },
   "top-right": {
     position: "absolute",
-    top: "10%",
-    right: "6%",
-    width: "88%",
+    top: 192,
+    left: 60,
+    right: 60,
     alignItems: "flex-end",
   },
   // Face-safe center: deliberately lower than mathematical center.
   center: {
     position: "absolute",
-    top: "60%",
-    left: "50%",
-    width: "88%",
-    transform: "translateX(-50%)",
+    top: 960,
+    left: 60,
+    right: 60,
+    transform: "translateY(-50%)",
     alignItems: "center",
   },
   "center-left": {
     position: "absolute",
-    top: "60%",
-    left: "6%",
-    width: "88%",
+    top: 960,
+    left: 60,
+    right: 60,
+    transform: "translateY(-50%)",
     alignItems: "flex-start",
   },
   "center-right": {
     position: "absolute",
-    top: "60%",
-    right: "6%",
-    width: "88%",
+    top: 960,
+    left: 60,
+    right: 60,
+    transform: "translateY(-50%)",
     alignItems: "flex-end",
   },
   bottom: {
     position: "absolute",
-    bottom: "8%",
-    left: "50%",
-    width: "88%",
-    transform: "translateX(-50%)",
+    bottom: 154,
+    left: 60,
+    right: 60,
     alignItems: "center",
   },
   "bottom-left": {
     position: "absolute",
-    bottom: "8%",
-    left: "6%",
-    width: "88%",
+    bottom: 154,
+    left: 60,
+    right: 60,
     alignItems: "flex-start",
   },
   "bottom-right": {
     position: "absolute",
-    bottom: "8%",
-    right: "6%",
-    width: "88%",
+    bottom: 154,
+    left: 60,
+    right: 60,
     alignItems: "flex-end",
   },
   // Aliases used by some older/generated plans.
   lower_third: {
     position: "absolute",
-    top: "64%",
-    left: "50%",
-    width: "88%",
-    transform: "translateX(-50%)",
+    top: 1229,
+    left: 60,
+    right: 60,
     alignItems: "center",
   },
   bottom_third: {
     position: "absolute",
-    top: "64%",
-    left: "50%",
-    width: "88%",
-    transform: "translateX(-50%)",
+    top: 1229,
+    left: 60,
+    right: 60,
     alignItems: "center",
   },
 };
@@ -384,6 +383,8 @@ const Popup: React.FC<{
         style={{
           opacity,
           transform: `scale(${scale})`,
+          maxWidth: "100%",
+          overflow: "hidden",
           ...containerStyle,
         }}
       >
@@ -402,8 +403,11 @@ export const MainReel: React.FC<MainReelProps> = ({ videoUrl, popups }) => {
   const cleanUrl = String(videoUrl || "").trim();
 
   return (
-    <AbsoluteFill
+    <div
       style={{
+        position: "relative",
+        width: 1080,
+        height: 1920,
         backgroundColor: "black",
         overflow: "hidden",
       }}
@@ -455,7 +459,7 @@ export const MainReel: React.FC<MainReelProps> = ({ videoUrl, popups }) => {
           </Sequence>
         );
       })}
-    </AbsoluteFill>
+    </div>
   );
 };
 
