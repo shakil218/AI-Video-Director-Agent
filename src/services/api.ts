@@ -343,7 +343,8 @@ export async function approvePlan(
   plan: EditPlan,
   isMock: boolean = false,
   sourceVideoUrl?: string | null,
-  wantedProps: WantedProp[] = []
+  wantedProps: WantedProp[] = [],
+  durationInFrames?: number
 ): Promise<APIResponse> {
   const cleanVideoUrl = unwrapProxyUrl(sourceVideoUrl);
   const isPermanentSourceUrl = /^https?:\/\//i.test(cleanVideoUrl);
@@ -376,6 +377,9 @@ export async function approvePlan(
       overlays: plan?.popups || [],
       videoUrl: cleanVideoUrl,
       mediaUrl: cleanVideoUrl,
+      durationInFrames,
+      sourceDurationInSeconds:
+        typeof durationInFrames === 'number' ? durationInFrames / 30 : undefined,
     };
 
     const response = await fetch(N8N_WEBHOOK_URL, {

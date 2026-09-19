@@ -175,6 +175,14 @@ The agent is designed to communicate with an n8n webhook workflow. A typical wor
      ```
 3. **Respond to Webhook Node**: Returns the parsed edit plan to the web application.
 
+### Render duration contract
+
+The browser reads the uploaded video's duration from its media metadata and sends
+both `sourceDurationInSeconds` and the equivalent `durationInFrames` (30 fps) with
+the render request. The n8n render path must preserve those fields when building
+Remotion `inputProps`; `remotion/Root.tsx` uses them in `calculateMetadata` so the
+final composition ends at the source duration instead of a fixed timeline length.
+
 ---
 
 ## 🗺️ Roadmap & Future Enhancements

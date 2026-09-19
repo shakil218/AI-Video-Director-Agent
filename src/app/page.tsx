@@ -487,6 +487,10 @@ export default function Home() {
       formData.append('sessionId', sessionId);
       formData.append('videoUrl', renderVideoUrl);
       formData.append('mediaUrl', renderVideoUrl);
+      if (videoDuration > 0) {
+        formData.append('durationInFrames', String(durationInFrames));
+        formData.append('sourceDurationInSeconds', String(videoDuration));
+      }
       console.log('[FRONTEND RENDER DIAGNOSTIC]', {
         count: latestOverlays.length,
         first: latestOverlays[0],
@@ -590,8 +594,10 @@ export default function Home() {
     () => ({
       videoUrl: videoUrl ?? '',
       popups: overlays.map((item) => ({ ...item })) as unknown as PopupData[],
+      durationInFrames,
+      sourceDurationInSeconds: videoDuration > 0 ? videoDuration : undefined,
     }),
-    [videoUrl, overlays]
+    [videoUrl, overlays, durationInFrames, videoDuration]
   );
 
   const startEditing = (item: OverlayItem) => {

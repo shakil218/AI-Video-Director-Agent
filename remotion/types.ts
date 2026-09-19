@@ -39,4 +39,6 @@ export interface MainReelProps extends Record<string, unknown> {
   videoUrl: string;
   popups?: PopupItem[];
   lower_thirds?: LowerThirdItem[];
+  durationInFrames?: number;
+  sourceDurationInSeconds?: number;
 }

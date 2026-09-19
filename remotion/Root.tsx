@@ -1,7 +1,10 @@
 import React from "react";
 import { Composition } from "remotion";
 import { MainComposition } from "./Composition";
+import { MainReelProps } from "./types";
 import "./index.css";
+
+const FPS = 30;
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -9,8 +12,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="MainReel"
         component={MainComposition}
-        durationInFrames={1800} // 60 seconds at 30fps
-        fps={30}
+        fps={FPS}
         width={1080}
         height={1920}
         defaultProps={{
@@ -34,7 +36,24 @@ export const RemotionRoot: React.FC = () => {
             },
           ],
         }}
+        calculateMetadata={async ({ props }) => ({
+          durationInFrames: getDurationInFrames(props),
+        })}
       />
     </>
   );
 };
+
+function getDurationInFrames(props: MainReelProps): number {
+  const requestedFrames = Number(props.durationInFrames);
+  if (Number.isFinite(requestedFrames) && requestedFrames > 0) {
+    return Math.max(1, Math.ceil(requestedFrames));
+  }
+
+  const sourceDurationInSeconds = Number(props.sourceDurationInSeconds);
+  if (Number.isFinite(sourceDurationInSeconds) && sourceDurationInSeconds > 0) {
+    return Math.max(1, Math.ceil(sourceDurationInSeconds * FPS));
+  }
+
+  return 1;
+}

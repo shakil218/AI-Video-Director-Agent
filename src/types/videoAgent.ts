@@ -62,6 +62,9 @@ export interface WebhookApprovePayload {
   sessionId: string;
   plan: EditPlan;
   videoUrl?: string;
+  mediaUrl?: string;
+  durationInFrames?: number;
+  sourceDurationInSeconds?: number;
 }
 
 export interface WantedProp {

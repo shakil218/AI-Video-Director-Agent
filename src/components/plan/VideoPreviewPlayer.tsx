@@ -25,6 +25,7 @@ export const VideoPreviewPlayer: React.FC<VideoPreviewPlayerProps> = ({
         inputProps={{
           videoUrl,
           popups,
+          durationInFrames,
         }}
         durationInFrames={durationInFrames}
         fps={fps}

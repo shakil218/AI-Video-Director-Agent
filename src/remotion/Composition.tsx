@@ -60,6 +60,8 @@ export interface PopupData {
 export interface MainReelProps extends Record<string, unknown> {
   videoUrl: string;
   popups: PopupData[];
+  durationInFrames?: number;
+  sourceDurationInSeconds?: number;
 }
 
 export type MainCompositionProps = MainReelProps;
