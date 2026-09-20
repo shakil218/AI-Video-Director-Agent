@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ChevronRight } from "lucide-react";
+import { LivingGradient } from "./living-gradient";
 
 interface HeroSectionProps extends React.HTMLAttributes<HTMLDivElement> {
   title?: string;
@@ -23,6 +24,12 @@ interface HeroSectionProps extends React.HTMLAttributes<HTMLDivElement> {
     opacity?: number;
     lightLineColor?: string;
     darkLineColor?: string;
+  };
+  gradientOptions?: {
+    intensity?: number;
+    speed?: number;
+    grain?: number;
+    resolutionScale?: number;
   };
 }
 
@@ -100,6 +107,7 @@ const HeroSection = React.forwardRef<HTMLDivElement, HeroSectionProps>(
       onCtaClick,
       bottomImage,
       gridOptions,
+      gradientOptions,
       ...props
     },
     ref
@@ -107,11 +115,12 @@ const HeroSection = React.forwardRef<HTMLDivElement, HeroSectionProps>(
     return (
       <div
         ref={ref}
-        className={cn("relative min-h-screen bg-[#050507]", className)}
+        // Added 'isolate' to properly scope the fixed LivingGradient behind the content
+        className={cn("relative isolate min-h-screen bg-[#050507]", className)}
         {...props}
       >
-        {/* Purple glow */}
-        <div className="pointer-events-none absolute left-1/2 top-0 z-0 h-screen w-[120vw] -translate-x-1/2 bg-[radial-gradient(ellipse_30%_70%_at_50%_-20%,rgba(124,58,237,0.34),rgba(255,255,255,0))]" />
+        {/* Dynamic WebGL Background replaces the static purple glow */}
+        <LivingGradient {...gradientOptions} />
 
         <section className="relative z-1 mx-auto max-w-full">
           <RetroGrid {...gridOptions} />

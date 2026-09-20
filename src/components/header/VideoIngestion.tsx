@@ -109,19 +109,19 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
   const isButtonDisabled = !videoFile || isProcessing || isEngineStarting;
 
   return (
-    <div className="w-full bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl backdrop-blur-sm transition-all hover:border-slate-700/80">
-      <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-        <div className="w-full lg:w-3/5 flex flex-col gap-3">
+    <div className="w-full rounded-2xl border border-white/10 bg-black/20 p-4 backdrop-blur-sm transition-colors hover:border-white/20 sm:p-5">
+      <div className="flex flex-col items-center justify-between gap-6 lg:flex-row">
+        <div className="flex w-full flex-col gap-3 lg:w-3/5">
           {!videoUrl ? (
             <div
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
-              className={`relative flex flex-col items-center justify-center min-h-50 sm:min-h-55 rounded-xl border-2 border-dashed p-6 text-center cursor-pointer transition-all duration-300 ${
+              className={`relative flex min-h-50 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition-all duration-300 sm:min-h-55 ${
                 isDragOver
-                  ? 'border-emerald-400 bg-emerald-500/10 scale-[1.01]'
-                  : 'border-slate-700/80 bg-slate-950/60 hover:border-emerald-500/50 hover:bg-slate-900/90'
+                  ? 'scale-[1.01] border-purple-300/70 bg-purple-400/10'
+                  : 'border-white/15 bg-white/2.5 hover:border-purple-300/40 hover:bg-purple-400/5'
               }`}
             >
               <input
@@ -131,22 +131,22 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
                 onChange={handleFileChange}
                 className="hidden"
               />
-              <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-3 shadow-lg shadow-emerald-500/10">
-                <UploadCloud className="w-6 h-6 animate-bounce" />
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-purple-400/25 bg-purple-400/10 text-purple-200">
+                <UploadCloud className="h-6 w-6" />
               </div>
-              <h3 className="text-base font-semibold text-slate-200">
-                Drop your local source <span className="text-emerald-400 font-mono">.mp4</span> file here
+              <h3 className="text-base font-semibold text-white">
+                Drop your local source <span className="font-mono text-purple-200">.mp4</span> file here
               </h3>
-              <p className="text-xs text-slate-400 mt-1 max-w-sm">
+              <p className="mt-1 max-w-sm text-xs leading-5 text-white/40">
                 or click to browse your computer. Supports MP4 video files for AI speech transcript & cut analysis.
               </p>
-              <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800 text-[11px] text-slate-300 border border-slate-700 font-medium">
-                <FileVideo className="w-3.5 h-3.5 text-emerald-400" />
+              <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium text-white/65">
+                <FileVideo className="h-3.5 w-3.5 text-purple-200" />
                 Select .mp4 File
               </div>
             </div>
           ) : (
-            <div className="relative w-full rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shadow-2xl group">
+            <div className="group relative w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl shadow-black/40">
               <video
                 ref={videoRef}
                 src={videoUrl}
@@ -155,12 +155,12 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
                 onLoadedMetadata={handleLoadedMetadata}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
-                className="w-full max-h-75 object-contain bg-black"
+                className="max-h-75 w-full bg-black object-contain"
               />
 
-              <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-slate-950 via-slate-950/90 to-transparent p-3 flex flex-col gap-2 transition-opacity opacity-90 group-hover:opacity-100">
+              <div className="absolute bottom-0 left-0 right-0 flex flex-col gap-2 bg-linear-to-t from-black via-black/80 to-transparent p-3 opacity-90 transition-opacity group-hover:opacity-100">
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-mono text-emerald-400 w-12 text-right">
+                  <span className="w-12 text-right font-mono text-[11px] text-purple-200">
                     {formatSecondsToTimecode(currentTime)}
                   </span>
                   <input
@@ -170,9 +170,9 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
                     step={0.1}
                     value={currentTime}
                     onChange={handleSeek}
-                    className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-400"
+                    className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-white/10 accent-purple-300"
                   />
-                  <span className="text-[11px] font-mono text-slate-400 w-12">
+                  <span className="w-12 font-mono text-[11px] text-white/40">
                     {formatSecondsToTimecode(duration)}
                   </span>
                 </div>
@@ -180,27 +180,30 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <button
+                      type="button"
                       onClick={togglePlayPause}
-                      className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-colors shadow-md shadow-emerald-500/20 cursor-pointer"
+                      className="cursor-pointer rounded-lg bg-white p-1.5 text-black transition hover:bg-white/90"
                     >
-                      {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                      {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4" />}
                     </button>
                     <button
+                      type="button"
                       onClick={() => {
                         if (videoRef.current) {
                           videoRef.current.currentTime = 0;
                         }
                       }}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+                      className="cursor-pointer rounded-lg border border-white/10 bg-white/5 p-1.5 text-white/65 transition hover:bg-white/10 hover:text-white"
                       title="Reset to beginning"
                     >
-                      <RotateCcw className="w-3.5 h-3.5" />
+                      <RotateCcw className="h-3.5 w-3.5" />
                     </button>
                   </div>
 
                   <button
+                    type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="text-xs text-slate-400 hover:text-slate-200 underline font-medium cursor-pointer"
+                    className="cursor-pointer text-xs font-medium text-white/45 underline transition hover:text-white"
                   >
                     Change Video
                   </button>
@@ -217,37 +220,37 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
           )}
         </div>
 
-        <div className="w-full lg:w-2/5 flex flex-col justify-between h-full gap-4">
+        <div className="flex h-full w-full flex-col justify-between gap-4 lg:w-2/5">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Film className="w-4 h-4 text-emerald-400" />
-              <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider">
+            <div className="mb-2 flex items-center gap-2">
+              <Film className="h-4 w-4 text-purple-200" />
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-white/80">
                 Source Video Details
               </h2>
             </div>
 
             {videoFile ? (
-              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
+              <div className="space-y-2 rounded-xl border border-white/10 bg-black/20 p-3.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400">File Name:</span>
-                  <span className="font-mono text-slate-200 font-medium truncate max-w-45">
+                  <span className="text-white/40">File Name:</span>
+                  <span className="max-w-45 truncate font-mono font-medium text-white/80">
                     {videoFile.name}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400">File Size:</span>
-                  <span className="font-mono text-slate-300">{formatFileSize(videoFile.size)}</span>
+                  <span className="text-white/40">File Size:</span>
+                  <span className="font-mono text-white/70">{formatFileSize(videoFile.size)}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Duration:</span>
-                  <span className="font-mono text-emerald-400">
+                  <span className="text-white/40">Duration:</span>
+                  <span className="font-mono text-purple-200">
                     {duration ? formatSecondsToTimecode(duration) : 'Loading...'}
                   </span>
                 </div>
               </div>
             ) : (
-              <div className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/60 text-xs text-slate-500 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-slate-600 shrink-0" />
+              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 p-3.5 text-xs text-white/35">
+                <AlertCircle className="h-4 w-4 shrink-0 text-white/30" />
                 <span>No video file loaded yet. Drop an .mp4 file to preview & analyze.</span>
               </div>
             )}
@@ -255,34 +258,35 @@ export const VideoIngestion: React.FC<VideoIngestionProps> = ({
 
           <div className="pt-2">
             <button
+              type="button"
               onClick={onAnalyzeVideo}
               disabled={isButtonDisabled}
-              className={`w-full relative flex items-center justify-center gap-2.5 py-3 px-5 rounded-xl font-bold text-sm transition-all duration-300 shadow-lg ${
+              className={`relative flex w-full items-center justify-center gap-2.5 rounded-xl px-5 py-3 text-sm font-semibold transition-all duration-300 ${
                 isButtonDisabled
-                  ? 'bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed'
+                  ? 'cursor-not-allowed border border-white/10 bg-white/5 text-white/30'
                   : hasPlan
-                  ? 'bg-emerald-600/20 border border-emerald-500/50 text-emerald-300 hover:bg-emerald-600/30 shadow-emerald-500/10 cursor-pointer'
-                  : 'bg-linear-to-r from-emerald-500 via-teal-500 to-emerald-400 text-slate-950 hover:brightness-110 shadow-emerald-500/25 active:scale-[0.99] cursor-pointer'
+                  ? 'cursor-pointer border border-purple-300/30 bg-purple-400/10 text-purple-100 hover:bg-purple-400/20'
+                  : 'cursor-pointer bg-white text-black hover:bg-white/90 active:scale-[0.99]'
               }`}
             >
               {isEngineStarting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                  <Loader2 className="h-4 w-4 animate-spin text-amber-300" />
                   <span>Starting Engine (Render Cold Start)...</span>
                 </>
               ) : isProcessing ? (
                 <>
-                  <Sparkles className="w-4 h-4 animate-spin text-emerald-400" />
+                  <Sparkles className="h-4 w-4 animate-spin text-purple-200" />
                   <span>Gemini Analyzing Audio & Speech...</span>
                 </>
               ) : hasPlan ? (
                 <>
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <CheckCircle2 className="h-4 w-4 text-emerald-300" />
                   <span>Re-Analyze Video Transcript</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4" />
+                  <Sparkles className="h-4 w-4" />
                   <span>Analyze Video (Extract Audio & Cuts)</span>
                 </>
               )}
