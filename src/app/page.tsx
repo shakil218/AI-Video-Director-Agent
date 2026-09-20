@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo, useId } from 'react';
 import { Player } from '@remotion/player';
 import Composition, { PopupData } from '@/remotion/Composition';
+import { HeroSection } from '@/components/ui/hero-section-dark';
 import { VideoIngestion, EngineStatus } from '@/components/header/VideoIngestion';
 import { 
   MessageSquare, ListVideo, Sparkles, RefreshCw, Radio, 
@@ -101,6 +102,16 @@ export default function Home() {
   const createStableId = (prefix: string) => {
     idSequenceRef.current += 1;
     return `${prefix}-${idSequenceRef.current}`;
+  };
+
+  const [showStudio, setShowStudio] = useState<boolean>(false);
+  const studioRef = useRef<HTMLDivElement | null>(null);
+
+  const openStudio = () => {
+    setShowStudio(true);
+    window.setTimeout(() => {
+      studioRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
 
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -676,637 +687,848 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8 font-sans">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header Bar */}
-        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                AI Video Director Agent
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 uppercase">
-                  N8N + GEMINI
-                </span>
-              </h1>
-            </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Autonomous Video Editing & Transcript Optimization Pipeline
-            </p>
-          </div>
+    <main className="min-h-screen bg-[#050507] text-white font-sans selection:bg-purple-500/30">
+      {!showStudio ? (
+        <div className="min-h-screen overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.18),transparent_34%),radial-gradient(circle_at_80%_20%,rgba(236,72,153,0.10),transparent_30%)] pointer-events-none" />
 
-          <div className="flex items-center gap-3">
-            {overlays.length > 0 && (
-              <button
-                type="button"
-                onClick={handleCopyJson}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 transition-colors cursor-pointer"
-                title="Copy Edit Plan JSON"
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                {copied ? 'Copied' : 'Export JSON'}
-              </button>
-            )}
-            <span className="font-mono text-xs text-emerald-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              {sessionId || 'Initializing...'}
-            </span>
+          <header className="relative z-30 mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-8">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 shadow-2xl shadow-purple-950/30">
+                <Sparkles className="h-5 w-5 text-purple-300" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold tracking-tight text-white">AI Video Director</div>
+                <div className="text-[10px] uppercase tracking-[0.22em] text-white/40">Autonomous editing agent</div>
+              </div>
+            </div>
+
             <button
               type="button"
-              onClick={handleNewSession}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 transition-colors cursor-pointer"
+              onClick={openStudio}
+              className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium text-white/80 backdrop-blur transition hover:border-white/20 hover:bg-white/10 hover:text-white"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
-              New Session
+              Open Studio
             </button>
-            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50 text-xs text-emerald-400 font-mono">
-              <Radio className="w-3.5 h-3.5 animate-pulse" />
-              n8n Webhook
-            </span>
-          </div>
-        </header>
+          </header>
 
-        {/* Video Ingestion Section */}
-        <VideoIngestion
-          videoFile={videoFile}
-          videoUrl={videoUrl}
-          onFileSelect={handleFileSelect}
-          onAnalyzeVideo={handleAnalyzeVideo}
-          isProcessing={isProcessing}
-          hasPlan={hasPlan}
-          videoRef={videoRef}
-          engineStatus={engineStatus}
-        />
-
-        {/* Director Workspace */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column: Chat Assistant */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col h-130 justify-between backdrop-blur-sm">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-emerald-400" />
-                <h2 className="text-sm font-semibold text-slate-200">Gemini Video Director Chat</h2>
-              </div>
-              <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono">
-                Agent Active
-              </span>
-            </div>
-
-            {/* Chat Stream */}
-            <div className="flex-1 overflow-y-auto my-3 pr-2 space-y-3">
-              {!hasPlan && chatMessages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500 space-y-2">
-                  <Sparkles className="w-8 h-8 text-slate-700" />
-                  <p className="text-xs font-medium text-slate-400">No Dialogue Yet</p>
-                  <p className="text-[11px] max-w-xs text-slate-500">
-                    Upload your source MP4 video above and click <strong className="text-emerald-400 font-normal">Analyze Video</strong> to start.
-                  </p>
-                </div>
-              ) : (
-                chatMessages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`p-3.5 rounded-xl border text-xs leading-relaxed space-y-1.5 ${
-                      msg.sender === 'bot'
-                        ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
-                        : 'bg-slate-800/80 border-slate-700 text-slate-200 ml-6'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-[10px] opacity-75">
-                      <span className="font-semibold flex items-center gap-1">
-                        {msg.sender === 'bot' ? '✨ Gemini Video Director' : '👤 You'}
-                      </span>
-                      <span className="font-mono">{msg.time}</span>
-                    </div>
-                    <p className="whitespace-pre-wrap">{msg.text}</p>
-                    {msg.badge && (
-                      <span className="inline-block mt-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                        {msg.badge}
-                      </span>
-                    )}
-                  </div>
-                ))
-              )}
-              <div ref={chatEndRef} />
-            </div>
-
-            {/* Quick Suggestions & Input Form */}
-            <div className="space-y-2 pt-2 border-t border-slate-800/80">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 text-[10px]">
-                <span className="text-slate-500 shrink-0 font-medium">Quick Revisions:</span>
-                <button
-                  type="button"
-                  disabled={isProcessing}
-                  onClick={() => handleSendRevision('Make cut #2 shorter by 3 seconds')}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 shrink-0 transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  Make cut #2 shorter by 3 seconds
-                </button>
-                <button
-                  type="button"
-                  disabled={isProcessing}
-                  onClick={() => handleSendRevision('Add high-tech B-roll overlay at 00:15')}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 shrink-0 transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  Add high-tech B-roll overlay at 00:15
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={revisionInput}
-                  disabled={isProcessing}
-                  onChange={(e) => setRevisionInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendRevision()}
-                  placeholder={isProcessing ? "n8n Processing Prompt..." : "Request an AI revision (e.g. 'Match 20 specific props')..."}
-                  className="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 disabled:opacity-50"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleSendRevision()}
-                  disabled={isProcessing}
-                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  {isProcessing ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Send className="w-3.5 h-3.5" />
-                  )}
-                  Send
-                </button>
-              </div>
-            </div>
+          <div className="relative z-10">
+            <HeroSection
+              title="AI Video Director Agent"
+              subtitle={{
+                regular: "Turn raw footage into ",
+                gradient: "reel-ready stories.",
+              }}
+              description="Upload one video and let the agent analyze the transcript, build an edit plan, place overlays, and prepare a polished 9:16 export."
+              ctaText="Get Started"
+              ctaHref="#studio"
+              onCtaClick={openStudio}
+              bottomImage={{
+                light:
+                  "https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=1800&q=85",
+                dark:
+                  "https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=1800&q=85",
+              }}
+              gridOptions={{
+                angle: 65,
+                opacity: 0.28,
+                cellSize: 60,
+                lightLineColor: "#5b4b8a",
+                darkLineColor: "#35255f",
+              }}
+            />
           </div>
 
-          {/* Right Column: Interactive Overlay Cards */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col h-130 justify-between backdrop-blur-sm">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
-              <div className="flex items-center gap-2">
-                <ListVideo className="w-4 h-4 text-emerald-400" />
-                <h2 className="text-sm font-semibold text-slate-200">Edit Plan Review</h2>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddingNew(!isAddingNew)}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <Plus className="w-3 h-3 text-emerald-400" />
-                  Add Card
-                </button>
-
-                {hasPlan && (
-                  <button
-                    type="button"
-                    onClick={handleRenderVideo}
-                    disabled={isRendering || isProcessing}
-                    className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-[11px] flex items-center gap-1 transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    {isRendering ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Film className="w-3 h-3" />
-                    )}
-                    Render Output
-                  </button>
-                )}
-                <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-mono">
-                  {hasPlan ? `Approved (${overlays.length} Props)` : 'Awaiting Ingestion'}
-                </span>
-              </div>
-            </div>
-
-            {(isRendering || renderProgress > 0) && (
-              <div className="mt-3 rounded-xl border border-emerald-500/30 bg-slate-950/80 p-3 space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    {isRendering ? (
-                      <Loader2 className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-                    ) : renderStatus === 'completed' ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    ) : (
-                      <Film className="w-3.5 h-3.5 text-emerald-400" />
-                    )}
-                    <span className="text-[11px] font-semibold text-slate-200">
-                      {renderStatus === 'completed' ? 'Render Complete' : renderStatus === 'error' ? 'Render Error' : 'Rendering Video'}
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-mono text-emerald-400">{renderProgress}%</span>
-                </div>
-
-                <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
+          <div className="relative z-20 mx-auto -mt-20 max-w-5xl px-6 pb-20 lg:px-8">
+            <div className="grid gap-3 md:grid-cols-3">
+              {[
+                {
+                  icon: Radio,
+                  label: "AI Analysis",
+                  text: "Transcript-aware edit planning with Gemini + n8n.",
+                },
+                {
+                  icon: Film,
+                  label: "Reel Canvas",
+                  text: "Native 1080 × 1920 preview for vertical social video.",
+                },
+                {
+                  icon: CheckCircle2,
+                  label: "Render Ready",
+                  text: "Push the approved plan to Remotion for final export.",
+                },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
                   <div
-                    className="h-full rounded-full bg-emerald-500 transition-all duration-300 ease-out"
-                    style={{ width: `${renderProgress}%` }}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
-                  <span>Remotion render progress</span>
-                  <span>{isRendering ? 'Live' : renderStatus === 'completed' ? 'Done' : 'Stopped'}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Category Filter Tabs */}
-            {hasPlan && (
-              <div className="flex items-center justify-between py-2 text-xs font-mono border-b border-slate-800/60">
-                <div className="flex items-center gap-1.5">
-                  {(['all', 'cuts', 'broll', 'popups'] as const).map((tab) => (
-                    <button
-                      type="button"
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={`px-3 py-1 rounded-lg border transition-all text-[11px] capitalize cursor-pointer ${
-                        activeTab === tab
-                          ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-bold'
-                          : 'bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700'
-                      }`}
-                    >
-                      {tab === 'all' && `All (${counts.all})`}
-                      {tab === 'cuts' && `Cuts (${counts.cuts})`}
-                      {tab === 'broll' && `Broll (${counts.broll})`}
-                      {tab === 'popups' && `Popups (${counts.popups})`}
-                    </button>
-                  ))}
-                </div>
-                {currentTime > 0 && (
-                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40">
-                    Playback: {currentTime.toFixed(1)}s
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Add New Card Inline Form */}
-            {isAddingNew && (
-              <div className="p-3 rounded-xl bg-slate-950 border border-emerald-500/40 space-y-2 text-xs my-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-emerald-400 text-[11px]">Create New Overlay Card</span>
-                  <button type="button" onClick={() => setIsAddingNew(false)} className="text-slate-400 hover:text-white">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 gap-2">
-                  <input
-                    type="text"
-                    value={newFormData.headline || ''}
-                    onChange={(e) => setNewFormData({ ...newFormData, headline: e.target.value })}
-                    placeholder="Spoken line"
-                    className="bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-[10px]">
-                  <select
-                    value={newFormData.type || 'popup'}
-                    onChange={(e) => setNewFormData({ ...newFormData, type: e.target.value as OverlayItem['type'] })}
-                    className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
+                    key={item.label}
+                    className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 backdrop-blur-xl"
                   >
-                    <option value="popup">Popup</option>
-                    <option value="broll">Broll</option>
-                    <option value="cut">Cut</option>
-                  </select>
-                  <select
-                    value={newFormData.theme || 'bangla_reel'}
-                    onChange={(e) => setNewFormData({ ...newFormData, theme: e.target.value })}
-                    className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                  >
-                    {THEME_OPTIONS.map((theme) => <option key={theme.value} value={theme.value}>{theme.label}</option>)}
-                  </select>
-                  <select
-                    value={newFormData.fontFamily || 'Hind Siliguri'}
-                    onChange={(e) => setNewFormData({ ...newFormData, fontFamily: e.target.value })}
-                    className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                  >
-                    {FONT_OPTIONS.map((font) => <option key={font.value} value={font.value}>{font.label}</option>)}
-                  </select>
-                  <select
-                    value={newFormData.highlightColor || 'green'}
-                    onChange={(e) => setNewFormData({ ...newFormData, highlightColor: e.target.value })}
-                    className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                  >
-                    {HIGHLIGHT_COLORS.map((color) => <option key={color.value} value={color.value}>{color.label}</option>)}
-                  </select>
-                  <input
-                    type="text"
-                    value={newFormData.highlightText || ''}
-                    onChange={(e) => setNewFormData({ ...newFormData, highlightText: e.target.value })}
-                    placeholder="Highlight word/phrase (optional)"
-                    className="bg-slate-900 border border-slate-700 rounded p-1 text-white col-span-2"
-                  />
-                  <input
-                    type="text"
-                    value={newFormData.position || ''}
-                    onChange={(e) => setNewFormData({ ...newFormData, position: e.target.value })}
-                    placeholder="Position"
-                    className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      value={newFormData.start_time ?? ''}
-                      onChange={(e) => setNewFormData({ ...newFormData, start_time: e.target.value })}
-                      placeholder="Start (s)"
-                      className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                    />
-                    <input
-                      type="text"
-                      value={newFormData.end_time ?? ''}
-                      onChange={(e) => setNewFormData({ ...newFormData, end_time: e.target.value })}
-                      placeholder="End (s)"
-                      className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                    />
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddNewOverlay}
-                  className="w-full py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs cursor-pointer"
-                >
-                  Save Card
-                </button>
-              </div>
-            )}
-
-            {/* Structured Card Items Container */}
-            <div className="flex-1 overflow-y-auto my-3 pr-2 space-y-2.5">
-              {!hasPlan ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500 space-y-2">
-                  <ListVideo className="w-8 h-8 text-slate-700" />
-                  <p className="text-xs font-medium text-slate-400">No Plan Generated</p>
-                  <p className="text-[11px] max-w-xs text-slate-500">
-                    Once video analysis completes, your structured cut list, popups, and visual recommendations will appear here.
-                  </p>
-                </div>
-              ) : filteredOverlays.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-slate-500 text-xs">
-                  No items found for this filter tab.
-                </div>
-              ) : (
-                filteredOverlays.map((item: OverlayItem, index: number) => {
-                  const itemKey = item.id || `overlay-${index}`;
-                  const isEditing = editingId === itemKey;
-                  const active = isItemActive(item);
-
-                  if (isEditing) {
-                    return (
-                      <div
-                        key={itemKey}
-                        className="p-3.5 rounded-xl bg-slate-950 border border-emerald-500/50 space-y-2 text-xs"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-bold text-emerald-400 text-[11px]">Editing Overlay</span>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => saveEditing(itemKey)}
-                              className="p-1 rounded bg-emerald-500 text-slate-950 hover:bg-emerald-400 font-bold cursor-pointer"
-                            >
-                              <Save className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={cancelEditing}
-                              className="p-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-2">
-                          <input
-                            type="text"
-                            value={editFormData.headline || ''}
-                            onChange={(e) => setEditFormData({ ...editFormData, headline: e.target.value })}
-                            placeholder="Spoken line"
-                            className="bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 text-[10px]">
-                          <select
-                            value={editFormData.type || 'popup'}
-                            onChange={(e) => setEditFormData({ ...editFormData, type: e.target.value as OverlayItem['type'] })}
-                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                          >
-                            <option value="popup">Popup</option>
-                            <option value="broll">Broll</option>
-                            <option value="cut">Cut</option>
-                          </select>
-                          <select
-                            value={editFormData.theme || 'bangla_reel'}
-                            onChange={(e) => setEditFormData({ ...editFormData, theme: e.target.value })}
-                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                          >
-                            {THEME_OPTIONS.map((theme) => <option key={theme.value} value={theme.value}>{theme.label}</option>)}
-                          </select>
-                          <select
-                            value={editFormData.fontFamily || 'Hind Siliguri'}
-                            onChange={(e) => setEditFormData({ ...editFormData, fontFamily: e.target.value })}
-                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                          >
-                            {FONT_OPTIONS.map((font) => <option key={font.value} value={font.value}>{font.label}</option>)}
-                          </select>
-                          <select
-                            value={editFormData.highlightColor || 'green'}
-                            onChange={(e) => setEditFormData({ ...editFormData, highlightColor: e.target.value })}
-                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                          >
-                            {HIGHLIGHT_COLORS.map((color) => <option key={color.value} value={color.value}>{color.label}</option>)}
-                          </select>
-                          <input
-                            type="text"
-                            value={editFormData.highlightText || ''}
-                            onChange={(e) => setEditFormData({ ...editFormData, highlightText: e.target.value })}
-                            placeholder="Highlight word/phrase (optional)"
-                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white col-span-2"
-                          />
-                          <input
-                            type="text"
-                            value={editFormData.position || ''}
-                            onChange={(e) => setEditFormData({ ...editFormData, position: e.target.value })}
-                            placeholder="Position"
-                            className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                          />
-                          <div className="grid grid-cols-2 gap-2">
-                            <input
-                              type="text"
-                              value={editFormData.start_time ?? ''}
-                              onChange={(e) => setEditFormData({ ...editFormData, start_time: e.target.value })}
-                              placeholder="Start (s)"
-                              className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                            />
-                            <input
-                              type="text"
-                              value={editFormData.end_time ?? ''}
-                              onChange={(e) => setEditFormData({ ...editFormData, end_time: e.target.value })}
-                              placeholder="End (s)"
-                              className="bg-slate-900 border border-slate-700 rounded p-1 text-white"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div
-                      key={itemKey}
-                      className={`p-3.5 rounded-xl border transition-all duration-200 ${
-                        active
-                          ? 'bg-emerald-950/40 border-emerald-500/80 shadow-lg shadow-emerald-950/50 scale-[1.01]'
-                          : 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-[9px] font-mono font-semibold px-2 py-0.5 rounded uppercase ${
-                              item.type === 'cut'
-                                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                                : item.type === 'broll'
-                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                            }`}
-                          >
-                            {item.type || 'popup'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleSeekToTime(item.start_time)}
-                            className="flex items-center gap-1 font-mono text-[10px] text-slate-400 hover:text-emerald-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 cursor-pointer transition-colors"
-                          >
-                            <Clock className="w-2.5 h-2.5 text-slate-500" />
-                            {item.start_time ?? 0}s - {item.end_time ?? 0}s
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => startEditing(item)}
-                            className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors cursor-pointer"
-                            title="Edit Overlay"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteOverlay(itemKey)}
-                            className="p-1 text-slate-400 hover:text-rose-400 rounded hover:bg-slate-800 transition-colors cursor-pointer"
-                            title="Delete Overlay"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {item.headline && (
-                        <h3 className="text-xs font-semibold text-slate-100">{item.headline}</h3>
-                      )}
-                      <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] font-mono text-slate-500">
-                        <span>Pos: {item.position || 'bottom-center'}</span>
-                        <span>Theme: {item.theme || 'bold_clean'}</span>
-                      </div>
-                      <div className="mt-1 text-[10px] font-mono text-slate-500 flex items-center justify-between gap-2">
-                        <span>Font: {item.fontFamily || DEFAULT_FONT_FAMILY}</span>
-                        <span>
-                          {item.theme === 'bangla_reel'
-                            ? `Accent: ${item.highlightColor || DEFAULT_HIGHLIGHT_COLOR}`
-                            : 'Accent: —'}
-                        </span>
-                      </div>
+                    <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-xl border border-purple-400/20 bg-purple-400/10 text-purple-200">
+                      <Icon className="h-4 w-4" />
                     </div>
-                  );
-                })
-              )}
+                    <div className="text-sm font-semibold text-white">{item.label}</div>
+                    <p className="mt-1.5 text-xs leading-5 text-white/45">{item.text}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
+      ) : (
+        <div ref={studioRef} id="studio" className="scroll-mt-6">
+          <div className="relative overflow-hidden border-b border-white/10 bg-[#07070b]">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_-10%,rgba(124,58,237,0.24),transparent_30%),radial-gradient(circle_at_85%_0%,rgba(236,72,153,0.10),transparent_26%)]" />
 
-        {/* Live Canvas Preview */}
-        {hasPlan && videoUrl && (
-          <div className="bg-slate-900/80 border border-emerald-500/40 rounded-2xl p-5 space-y-3 backdrop-blur-sm mt-6">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                <h2 className="text-sm font-semibold text-slate-200">Live Rendered Preview</h2>
+            <div className="relative mx-auto flex max-w-7xl flex-col gap-5 px-6 py-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-purple-400/20 bg-purple-400/10">
+                  <Sparkles className="h-5 w-5 text-purple-200" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="text-lg font-semibold tracking-tight text-white">AI Video Director Agent</h1>
+                    <span className="rounded-full border border-purple-400/20 bg-purple-400/10 px-2.5 py-1 text-[9px] font-mono uppercase tracking-wider text-purple-200">
+                      N8N + GEMINI
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-white/40">
+                    Autonomous video editing, transcript optimization, and 9:16 reel rendering.
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <a
-                  href={videoUrl}
-                  download="source-video.mp4"
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs border border-slate-700 transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5 text-emerald-400" />
-                  Download Source
-                </a>
-                <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20">
-                  Real-Time Remotion Canvas
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                {overlays.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleCopyJson}
+                    className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/65 transition hover:bg-white/10 hover:text-white"
+                    title="Copy Edit Plan JSON"
+                  >
+                    {copied ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-300" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
+                    {copied ? 'Copied' : 'Export JSON'}
+                  </button>
+                )}
+
+                <span className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 font-mono text-[10px] text-purple-200">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.85)] animate-pulse" />
+                  {sessionId || 'Initializing...'}
                 </span>
-              </div>
-            </div>
-            {/* 9:16 Reel frame. overflow-hidden clips anything that would escape the frame. */}
-            <div
-              className="relative mx-auto w-full overflow-hidden rounded-xl border border-slate-800 bg-black"
-              style={{ maxWidth: `${PREVIEW_MAX_WIDTH_PX}px` }}
-            >
-              <Player
-                component={Composition}
-                inputProps={playerInputProps}
-                durationInFrames={durationInFrames}
-                fps={REEL_FPS}
-                compositionWidth={REEL_WIDTH}
-                compositionHeight={REEL_HEIGHT}
-                style={{
-                  width: '100%',
-                  aspectRatio: '9 / 16',
-                  margin: '0 auto',
-                  overflow: 'hidden',
-                }}
-                controls
-              />
-            </div>
-          </div>
-        )}
 
-        {/* Rendered Output Preview Card */}
-        {renderedVideoUrl && (
-          <div className="bg-slate-900/80 border border-emerald-500/40 rounded-2xl p-5 space-y-3 backdrop-blur-sm mt-6">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                <h2 className="text-sm font-semibold text-slate-200">Final Rendered Output</h2>
+                <button
+                  type="button"
+                  onClick={handleNewSession}
+                  className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/65 transition hover:bg-white/10 hover:text-white"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  New Session
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowStudio(false);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/50 transition hover:bg-white/10 hover:text-white"
+                >
+                  Back to Home
+                </button>
               </div>
-              <a
-                href={renderedVideoUrl}
-                download
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Download Export
-              </a>
-            </div>
-            <div
-              className="relative mx-auto w-full overflow-hidden rounded-xl border border-slate-800 bg-black"
-              style={{ maxWidth: `${PREVIEW_MAX_WIDTH_PX}px`, aspectRatio: '9 / 16' }}
-            >
-              <video
-                src={renderedVideoUrl}
-                controls
-                playsInline
-                className="w-full h-full object-contain"
-              />
             </div>
           </div>
-        )}
-      </div>
+
+          <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+            <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/2.5 p-4 shadow-2xl shadow-black/20 sm:p-5">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(124,58,237,0.12),transparent_40%)]" />
+              <div className="relative">
+                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-purple-200/70">01 · Source</div>
+                    <h2 className="mt-1 text-base font-semibold tracking-tight text-white">Bring in your footage</h2>
+                  </div>
+                  <span className="text-[11px] text-white/35">MP4 · browser upload · R2/S3 backed</span>
+                </div>
+
+                <VideoIngestion
+                  videoFile={videoFile}
+                  videoUrl={videoUrl}
+                  onFileSelect={handleFileSelect}
+                  onAnalyzeVideo={handleAnalyzeVideo}
+                  isProcessing={isProcessing}
+                  hasPlan={hasPlan}
+                  videoRef={videoRef}
+                  engineStatus={engineStatus}
+                />
+              </div>
+            </section>
+
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.02fr_0.98fr]">
+              <section className="flex min-h-150 flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/2.5 shadow-2xl shadow-black/20">
+                <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-purple-400/20 bg-purple-400/10">
+                      <MessageSquare className="h-4 w-4 text-purple-200" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-semibold text-white">Gemini Video Director Chat</h2>
+                      <p className="text-[10px] text-white/35">Refine the edit using plain language.</p>
+                    </div>
+                  </div>
+                  <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[9px] font-mono uppercase tracking-wider text-emerald-200">
+                    Agent Active
+                  </span>
+                </div>
+
+                <div className="flex flex-1 flex-col px-5 pb-5 pt-4">
+                  <div className="flex-1 overflow-y-auto pr-1">
+                    {!hasPlan && chatMessages.length === 0 ? (
+                      <div className="flex h-full min-h-90 flex-col items-center justify-center text-center">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+                          <Sparkles className="h-5 w-5 text-white/25" />
+                        </div>
+                        <p className="mt-4 text-sm font-medium text-white/70">Your director is ready.</p>
+                        <p className="mt-2 max-w-sm text-xs leading-5 text-white/35">
+                          Analyze a source video to create the first edit plan, then ask for timing,
+                          B-roll, popup, or cut changes here.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {chatMessages.map((msg) => (
+                          <div
+                            key={msg.id}
+                            className={`rounded-2xl border p-4 text-xs leading-relaxed ${
+                              msg.sender === 'bot'
+                                ? 'border-purple-400/20 bg-purple-400/[0.07] text-purple-100'
+                                : 'ml-8 border-white/10 bg-white/[0.035] text-white/75'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-3 text-[10px] text-white/35">
+                              <span className="font-semibold text-white/55">
+                                {msg.sender === 'bot' ? 'Gemini Video Director' : 'You'}
+                              </span>
+                              <span className="font-mono">{msg.time}</span>
+                            </div>
+                            <p className="mt-2 whitespace-pre-wrap">{msg.text}</p>
+                            {msg.badge && (
+                              <span className="mt-2 inline-flex rounded-full border border-purple-400/20 bg-purple-400/10 px-2 py-1 text-[9px] font-mono text-purple-200">
+                                {msg.badge}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
+
+                  <div className="mt-4 border-t border-white/10 pt-4">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 text-[10px]">
+                      <span className="shrink-0 font-medium text-white/30">Quick revisions</span>
+                      <button
+                        type="button"
+                        disabled={isProcessing}
+                        onClick={() => handleSendRevision('Make cut #2 shorter by 3 seconds')}
+                        className="shrink-0 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
+                      >
+                        Shorten cut #2
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isProcessing}
+                        onClick={() => handleSendRevision('Add high-tech B-roll overlay at 00:15')}
+                        className="shrink-0 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
+                      >
+                        Add B-roll at 00:15
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 p-1.5">
+                      <input
+                        type="text"
+                        value={revisionInput}
+                        disabled={isProcessing}
+                        onChange={(e) => setRevisionInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendRevision()}
+                        placeholder={
+                          isProcessing
+                            ? 'n8n is processing your revision...'
+                            : "Ask for an edit change, e.g. “Make the opening faster”"
+                        }
+                        className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-xs text-white outline-none placeholder:text-white/25 disabled:opacity-50"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleSendRevision()}
+                        disabled={isProcessing}
+                        className="flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-black transition hover:bg-white/90 disabled:opacity-40"
+                      >
+                        {isProcessing ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Send className="h-3.5 w-3.5" />
+                        )}
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="flex min-h-150 flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/2.5 shadow-2xl shadow-black/20">
+                <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-purple-400/20 bg-purple-400/10">
+                      <ListVideo className="h-4 w-4 text-purple-200" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-semibold text-white">Edit Plan Review</h2>
+                      <p className="text-[10px] text-white/35">Approve and tune the generated structure.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingNew(!isAddingNew)}
+                      className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-medium text-white/65 transition hover:bg-white/10 hover:text-white"
+                    >
+                      <Plus className="h-3.5 w-3.5 text-purple-200" />
+                      Add
+                    </button>
+
+                    {hasPlan && (
+                      <button
+                        type="button"
+                        onClick={handleRenderVideo}
+                        disabled={isRendering || isProcessing}
+                        className="flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-[11px] font-semibold text-black transition hover:bg-white/90 disabled:opacity-40"
+                      >
+                        {isRendering ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Film className="h-3.5 w-3.5" />
+                        )}
+                        Render
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex-1 px-5 pb-5 pt-4">
+                  {(isRendering || renderProgress > 0) && (
+                    <div className="mb-3 rounded-2xl border border-purple-400/20 bg-purple-400/5 p-3.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          {isRendering ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-200" />
+                          ) : renderStatus === 'completed' ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" />
+                          ) : (
+                            <Film className="h-3.5 w-3.5 text-purple-200" />
+                          )}
+                          <span className="text-[11px] font-semibold text-white/75">
+                            {renderStatus === 'completed'
+                              ? 'Render complete'
+                              : renderStatus === 'error'
+                                ? 'Render error'
+                                : 'Rendering video'}
+                          </span>
+                        </div>
+                        <span className="font-mono text-[11px] text-purple-200">{renderProgress}%</span>
+                      </div>
+
+                      <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-linear-to-r from-purple-500 via-fuchsia-500 to-pink-500 transition-all duration-300"
+                          style={{ width: `${renderProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {hasPlan && (
+                    <div className="mb-3 flex items-center justify-between gap-3 border-b border-white/10 pb-3">
+                      <div className="flex items-center gap-1.5 overflow-x-auto">
+                        {(['all', 'cuts', 'broll', 'popups'] as const).map((tab) => (
+                          <button
+                            type="button"
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={`shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-mono capitalize transition ${
+                              activeTab === tab
+                                ? 'border-purple-300/30 bg-purple-300/15 text-purple-100'
+                                : 'border-white/10 bg-white/2.5 text-white/35 hover:bg-white/5 hover:text-white/65'
+                            }`}
+                          >
+                            {tab === 'all' && `All (${counts.all})`}
+                            {tab === 'cuts' && `Cuts (${counts.cuts})`}
+                            {tab === 'broll' && `B-roll (${counts.broll})`}
+                            {tab === 'popups' && `Popups (${counts.popups})`}
+                          </button>
+                        ))}
+                      </div>
+
+                      {currentTime > 0 && (
+                        <span className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 font-mono text-[10px] text-emerald-200">
+                          {currentTime.toFixed(1)}s
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {isAddingNew && (
+                    <div className="mb-3 rounded-2xl border border-purple-400/20 bg-black/20 p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-purple-200">
+                          Create overlay
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingNew(false)}
+                          className="text-white/35 transition hover:text-white"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                        <input
+                          type="text"
+                          value={newFormData.headline || ''}
+                          onChange={(e) => setNewFormData({ ...newFormData, headline: e.target.value })}
+                          placeholder="Spoken line"
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none placeholder:text-white/20 focus:border-purple-400/30 sm:col-span-2"
+                        />
+                        <select
+                          value={newFormData.type || 'popup'}
+                          onChange={(e) =>
+                            setNewFormData({
+                              ...newFormData,
+                              type: e.target.value as OverlayItem['type'],
+                            })
+                          }
+                          className="rounded-xl border border-white/10 bg-[#0b0b10] px-3 py-2 text-xs text-white outline-none"
+                        >
+                          <option value="popup">Popup</option>
+                          <option value="broll">B-roll</option>
+                          <option value="cut">Cut</option>
+                        </select>
+                        <select
+                          value={newFormData.theme || 'bangla_reel'}
+                          onChange={(e) => setNewFormData({ ...newFormData, theme: e.target.value })}
+                          className="rounded-xl border border-white/10 bg-[#0b0b10] px-3 py-2 text-xs text-white outline-none"
+                        >
+                          {THEME_OPTIONS.map((theme) => (
+                            <option key={theme.value} value={theme.value}>
+                              {theme.label}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={newFormData.fontFamily || 'Hind Siliguri'}
+                          onChange={(e) => setNewFormData({ ...newFormData, fontFamily: e.target.value })}
+                          className="rounded-xl border border-white/10 bg-[#0b0b10] px-3 py-2 text-xs text-white outline-none"
+                        >
+                          {FONT_OPTIONS.map((font) => (
+                            <option key={font.value} value={font.value}>
+                              {font.label}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={newFormData.highlightColor || 'green'}
+                          onChange={(e) => setNewFormData({ ...newFormData, highlightColor: e.target.value })}
+                          className="rounded-xl border border-white/10 bg-[#0b0b10] px-3 py-2 text-xs text-white outline-none"
+                        >
+                          {HIGHLIGHT_COLORS.map((color) => (
+                            <option key={color.value} value={color.value}>
+                              {color.label}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          value={newFormData.highlightText || ''}
+                          onChange={(e) => setNewFormData({ ...newFormData, highlightText: e.target.value })}
+                          placeholder="Highlight word or phrase"
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none placeholder:text-white/20 sm:col-span-2"
+                        />
+                        <input
+                          type="text"
+                          value={newFormData.position || ''}
+                          onChange={(e) => setNewFormData({ ...newFormData, position: e.target.value })}
+                          placeholder="Position"
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none placeholder:text-white/20"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            value={newFormData.start_time ?? ''}
+                            onChange={(e) => setNewFormData({ ...newFormData, start_time: e.target.value })}
+                            placeholder="Start (s)"
+                            className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none placeholder:text-white/20"
+                          />
+                          <input
+                            type="text"
+                            value={newFormData.end_time ?? ''}
+                            onChange={(e) => setNewFormData({ ...newFormData, end_time: e.target.value })}
+                            placeholder="End (s)"
+                            className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none placeholder:text-white/20"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleAddNewOverlay}
+                        className="mt-3 w-full rounded-xl bg-white py-2.5 text-xs font-semibold text-black transition hover:bg-white/90"
+                      >
+                        Save Card
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="max-h-125 space-y-2.5 overflow-y-auto pr-1">
+                    {!hasPlan ? (
+                      <div className="flex min-h-82.5 flex-col items-center justify-center text-center">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+                          <ListVideo className="h-5 w-5 text-white/25" />
+                        </div>
+                        <p className="mt-4 text-sm font-medium text-white/60">No plan generated yet</p>
+                        <p className="mt-2 max-w-sm text-xs leading-5 text-white/30">
+                          Your cuts, B-roll, and popup recommendations will appear here after analysis.
+                        </p>
+                      </div>
+                    ) : filteredOverlays.length === 0 ? (
+                      <div className="flex min-h-82.5 items-center justify-center text-xs text-white/30">
+                        No items found for this filter.
+                      </div>
+                    ) : (
+                      filteredOverlays.map((item: OverlayItem, index: number) => {
+                        const itemKey = item.id || `overlay-${index}`;
+                        const isEditing = editingId === itemKey;
+                        const active = isItemActive(item);
+
+                        if (isEditing) {
+                          return (
+                            <div
+                              key={itemKey}
+                              className="rounded-2xl border border-purple-400/30 bg-purple-400/4 p-4"
+                            >
+                              <div className="mb-3 flex items-center justify-between gap-2">
+                                <span className="text-[11px] font-semibold uppercase tracking-wider text-purple-200">
+                                  Editing overlay
+                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => saveEditing(itemKey)}
+                                    className="rounded-lg bg-white p-1.5 text-black transition hover:bg-white/90"
+                                  >
+                                    <Save className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={cancelEditing}
+                                    className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-white/55 transition hover:text-white"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 gap-2">
+                                <input
+                                  type="text"
+                                  value={editFormData.headline || ''}
+                                  onChange={(e) => setEditFormData({ ...editFormData, headline: e.target.value })}
+                                  placeholder="Spoken line"
+                                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none placeholder:text-white/20"
+                                />
+                              </div>
+
+                              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                <select
+                                  value={editFormData.type || 'popup'}
+                                  onChange={(e) =>
+                                    setEditFormData({
+                                      ...editFormData,
+                                      type: e.target.value as OverlayItem['type'],
+                                    })
+                                  }
+                                  className="rounded-xl border border-white/10 bg-[#0b0b10] px-3 py-2 text-xs text-white outline-none"
+                                >
+                                  <option value="popup">Popup</option>
+                                  <option value="broll">B-roll</option>
+                                  <option value="cut">Cut</option>
+                                </select>
+                                <select
+                                  value={editFormData.theme || 'bangla_reel'}
+                                  onChange={(e) => setEditFormData({ ...editFormData, theme: e.target.value })}
+                                  className="rounded-xl border border-white/10 bg-[#0b0b10] px-3 py-2 text-xs text-white outline-none"
+                                >
+                                  {THEME_OPTIONS.map((theme) => (
+                                    <option key={theme.value} value={theme.value}>
+                                      {theme.label}
+                                    </option>
+                                  ))}
+                                </select>
+                                <select
+                                  value={editFormData.fontFamily || 'Hind Siliguri'}
+                                  onChange={(e) => setEditFormData({ ...editFormData, fontFamily: e.target.value })}
+                                  className="rounded-xl border border-white/10 bg-[#0b0b10] px-3 py-2 text-xs text-white outline-none"
+                                >
+                                  {FONT_OPTIONS.map((font) => (
+                                    <option key={font.value} value={font.value}>
+                                      {font.label}
+                                    </option>
+                                  ))}
+                                </select>
+                                <select
+                                  value={editFormData.highlightColor || 'green'}
+                                  onChange={(e) =>
+                                    setEditFormData({
+                                      ...editFormData,
+                                      highlightColor: e.target.value,
+                                    })
+                                  }
+                                  className="rounded-xl border border-white/10 bg-[#0b0b10] px-3 py-2 text-xs text-white outline-none"
+                                >
+                                  {HIGHLIGHT_COLORS.map((color) => (
+                                    <option key={color.value} value={color.value}>
+                                      {color.label}
+                                    </option>
+                                  ))}
+                                </select>
+                                <input
+                                  type="text"
+                                  value={editFormData.highlightText || ''}
+                                  onChange={(e) =>
+                                    setEditFormData({
+                                      ...editFormData,
+                                      highlightText: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Highlight word or phrase"
+                                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none placeholder:text-white/20 sm:col-span-2"
+                                />
+                                <input
+                                  type="text"
+                                  value={editFormData.position || ''}
+                                  onChange={(e) =>
+                                    setEditFormData({
+                                      ...editFormData,
+                                      position: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Position"
+                                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none placeholder:text-white/20"
+                                />
+                                <div className="grid grid-cols-2 gap-2">
+                                  <input
+                                    type="text"
+                                    value={editFormData.start_time ?? ''}
+                                    onChange={(e) =>
+                                      setEditFormData({
+                                        ...editFormData,
+                                        start_time: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Start (s)"
+                                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none placeholder:text-white/20"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={editFormData.end_time ?? ''}
+                                    onChange={(e) =>
+                                      setEditFormData({
+                                        ...editFormData,
+                                        end_time: e.target.value,
+                                      })
+                                    }
+                                    placeholder="End (s)"
+                                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none placeholder:text-white/20"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={itemKey}
+                            className={`rounded-2xl border p-4 transition ${
+                              active
+                                ? 'border-purple-300/40 bg-purple-400/8 shadow-lg shadow-purple-950/25'
+                                : 'border-white/10 bg-white/2.5 hover:bg-white/4'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`rounded-full border px-2 py-1 text-[9px] font-mono font-semibold uppercase ${
+                                    item.type === 'cut'
+                                      ? 'border-rose-400/20 bg-rose-400/10 text-rose-200'
+                                      : item.type === 'broll'
+                                        ? 'border-amber-400/20 bg-amber-400/10 text-amber-200'
+                                        : 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200'
+                                  }`}
+                                >
+                                  {item.type || 'popup'}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleSeekToTime(item.start_time)}
+                                  className="flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-2.5 py-1 font-mono text-[10px] text-white/45 transition hover:text-purple-200"
+                                >
+                                  <Clock className="h-2.5 w-2.5" />
+                                  {item.start_time ?? 0}s – {item.end_time ?? 0}s
+                                </button>
+                              </div>
+
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => startEditing(item)}
+                                  className="rounded-lg p-1.5 text-white/35 transition hover:bg-white/5 hover:text-white"
+                                  title="Edit Overlay"
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteOverlay(itemKey)}
+                                  className="rounded-lg p-1.5 text-white/35 transition hover:bg-white/5 hover:text-rose-300"
+                                  title="Delete Overlay"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {item.headline && (
+                              <h3 className="mt-3 text-sm font-semibold leading-6 text-white">{item.headline}</h3>
+                            )}
+
+                            <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/10 pt-3 text-[10px] font-mono text-white/25">
+                              <span>Pos: {item.position || 'bottom-center'}</span>
+                              <span className="text-right">Theme: {item.theme || 'bold_clean'}</span>
+                              <span>Font: {item.fontFamily || DEFAULT_FONT_FAMILY}</span>
+                              <span className="text-right">
+                                {item.theme === 'bangla_reel'
+                                  ? `Accent: ${item.highlightColor || DEFAULT_HIGHLIGHT_COLOR}`
+                                  : 'Accent: —'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            {hasPlan && videoUrl && (
+              <section className="rounded-3xl border border-white/10 bg-white/2.5 p-5 shadow-2xl shadow-black/20">
+                <div className="flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-purple-200/70">03 · Preview</div>
+                    <h2 className="mt-1 text-base font-semibold text-white">Live 9:16 composition</h2>
+                    <p className="mt-1 text-xs text-white/35">
+                      Preview the exact vertical canvas used by the Remotion composition.
+                    </p>
+                  </div>
+
+                  <a
+                    href={videoUrl}
+                    download="source-video.mp4"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/65 transition hover:bg-white/10 hover:text-white"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download Source
+                  </a>
+                </div>
+
+                <div className="mt-5 rounded-3xl border border-white/10 bg-black/30 p-3">
+                  <div
+                    className="relative mx-auto w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40"
+                    style={{ maxWidth: `${PREVIEW_MAX_WIDTH_PX}px` }}
+                  >
+                    <Player
+                      component={Composition}
+                      inputProps={playerInputProps}
+                      durationInFrames={durationInFrames}
+                      fps={REEL_FPS}
+                      compositionWidth={REEL_WIDTH}
+                      compositionHeight={REEL_HEIGHT}
+                      style={{
+                        width: '100%',
+                        aspectRatio: '9 / 16',
+                        margin: '0 auto',
+                        overflow: 'hidden',
+                      }}
+                      controls
+                    />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {renderedVideoUrl && (
+              <section className="rounded-3xl border border-emerald-400/20 bg-emerald-400/[0.035] p-5 shadow-2xl shadow-black/20">
+                <div className="flex flex-col gap-3 border-b border-emerald-400/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-emerald-200/70">04 · Export</div>
+                    <h2 className="mt-1 text-base font-semibold text-white">Final rendered output</h2>
+                    <p className="mt-1 text-xs text-white/35">
+                      Your finished reel is ready to review and download.
+                    </p>
+                  </div>
+
+                  <a
+                    href={renderedVideoUrl}
+                    download
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-black transition hover:bg-white/90"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download Export
+                  </a>
+                </div>
+
+                <div className="mt-5 flex justify-center rounded-3xl border border-white/10 bg-black/30 p-3">
+                  <div
+                    className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-black"
+                    style={{ maxWidth: `${PREVIEW_MAX_WIDTH_PX}px`, aspectRatio: '9 / 16' }}
+                  >
+                    <video
+                      src={renderedVideoUrl}
+                      controls
+                      playsInline
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            <footer className="pb-4 pt-2 text-center text-[10px] uppercase tracking-[0.22em] text-white/20">
+              AI Video Director Agent · n8n · Gemini · Remotion
+            </footer>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
