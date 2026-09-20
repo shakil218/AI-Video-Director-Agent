@@ -40,7 +40,7 @@ export const FeedbackInput: React.FC<FeedbackInputProps> = ({
       {/* Quick Prompt Pill Suggestions */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-slate-800">
         <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1 whitespace-nowrap mr-1">
-          <Wand2 className="w-3 h-3 text-emerald-400" />
+          <Wand2 className="w-3 h-3 text-purple-400" />
           Quick Revisions:
         </span>
         {QUICK_SUGGESTIONS.map((suggestion, idx) => (
@@ -49,7 +49,7 @@ export const FeedbackInput: React.FC<FeedbackInputProps> = ({
             type="button"
             disabled={disabled || isProcessing}
             onClick={() => handleSuggestionClick(suggestion)}
-            className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 hover:border-emerald-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="text-[11px] whitespace-nowrap px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300 hover:text-purple-400 hover:border-purple-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {suggestion}
           </button>
@@ -58,7 +58,7 @@ export const FeedbackInput: React.FC<FeedbackInputProps> = ({
 
       {/* Main Textarea Form */}
       <form onSubmit={handleSubmit} className="relative w-full">
-        <div className="relative rounded-2xl border border-slate-800 bg-slate-950/80 shadow-lg focus-within:border-emerald-500/60 focus-within:ring-1 focus-within:ring-emerald-500/30 transition-all">
+        <div className="relative rounded-2xl border border-slate-800 bg-slate-950/80 shadow-lg focus-within:border-purple-500/60 focus-within:ring-1 focus-within:ring-purple-500/30 transition-all duration-300">
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -86,23 +86,30 @@ export const FeedbackInput: React.FC<FeedbackInputProps> = ({
             <button
               type="submit"
               disabled={!text.trim() || isProcessing || disabled}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl font-bold text-xs transition-all shadow-md ${
+              className={`relative group inline-flex items-center justify-center gap-2 rounded-xl px-5 py-1.5 text-xs font-bold transition-all duration-300 overflow-hidden border ${
                 !text.trim() || isProcessing || disabled
-                  ? 'bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed'
-                  : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-emerald-500/20 active:scale-95'
+                  ? 'bg-slate-800 text-slate-500 border-slate-700/50 cursor-not-allowed'
+                  : 'text-white border-white/15 shadow-lg shadow-purple-950/50 hover:shadow-purple-500/30 active:scale-95 bg-linear-to-r from-purple-600 via-indigo-600 to-pink-600'
               }`}
             >
-              {isProcessing ? (
-                <>
-                  <Sparkles className="w-3.5 h-3.5 animate-spin" />
-                  <span>Updating Plan...</span>
-                </>
-              ) : (
-                <>
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Send Revision</span>
-                </>
+              {/* Shimmer overlay - ONLY show if the button is active */}
+              {!(!text.trim() || isProcessing || disabled) && (
+                <span className="absolute inset-0 bg-linear-to-r from-pink-600 via-purple-600 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               )}
+
+              <span className="relative z-10 flex items-center gap-1.5">
+                {isProcessing ? (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 animate-spin" />
+                    <span>Updating Plan...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                    <span>Send Revision</span>
+                  </>
+                )}
+              </span>
             </button>
           </div>
         </div>

@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { Video, Sparkles, Copy, Check, Server, Zap, RefreshCw } from 'lucide-react';
-import { Badge } from '@/components/ui/Badge';
 
 interface TopHeaderProps {
   sessionId: string;
@@ -30,20 +29,23 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
         {/* Left Branding */}
         <div className="flex items-center gap-3">
-          <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 p-0.5 shadow-lg shadow-emerald-500/20">
-            <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-              <Video className="w-5 h-5 text-emerald-400" />
+          {/* Animated Logo Container */}
+          <div className="group relative flex items-center justify-center w-10 h-10 rounded-xl bg-linear-to-tr from-emerald-600 via-emerald-500 to-teal-400 p-0.5 shadow-lg shadow-emerald-500/20 transition-all duration-500 hover:shadow-emerald-500/40 hover:scale-105 cursor-default">
+            {/* Pulsing background glow */}
+            <div className="absolute inset-0 bg-emerald-500/30 animate-pulse rounded-xl blur-sm" />
+            
+            <div className="relative w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center overflow-hidden">
+              <Video className="w-5 h-5 text-emerald-400 transition-transform duration-500 ease-out group-hover:rotate-12 group-hover:scale-110" />
             </div>
-            <Sparkles className="absolute -top-1 -right-1 w-4 h-4 text-emerald-300 animate-pulse" />
+            
+            <Sparkles className="absolute -top-1.5 -right-1.5 w-4 h-4 text-emerald-300 animate-pulse transition-transform duration-500 group-hover:scale-125" />
           </div>
+
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold tracking-tight text-slate-100 flex items-center gap-2">
                 AI Video Director Agent
               </h1>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase tracking-wider">
-                n8n + Gemini
-              </span>
             </div>
             <p className="text-xs text-slate-400 font-medium">
               Autonomous Video Editing & Transcript Optimization Pipeline
